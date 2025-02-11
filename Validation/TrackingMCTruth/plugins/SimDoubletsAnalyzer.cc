@@ -39,6 +39,9 @@
 
 #include "DQMServices/Core/interface/MonitorElement.h"
 
+#include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
+#include "Geometry/Records/interface/TrackerTopologyRcd.h"
+
 // -------------------------------------------------------------------------------------------------------------
 // class declaration
 // -------------------------------------------------------------------------------------------------------------
@@ -59,8 +62,11 @@ private:
   // ------------ member data ------------
 
   const TrackerGeometry* trackerGeometry_ = nullptr;
+  const TrackerTopology* trackerTopology_ = nullptr;
   const edm::ESGetToken<TrackerGeometry, TrackerDigiGeometryRecord> geometry_getToken_;
+  const edm::ESGetToken<TrackerTopology, TrackerTopologyRcd> topology_getToken_;
   const edm::EDGetTokenT<SimDoubletsCollection> simDoublets_getToken_;
+  const edm::EDGetTokenT<edmNew::DetSetVector<SiPixelCluster>> siPixelClusters_getToken_;
 
   // cutting parameters
   std::vector<double> cellMinz_;
@@ -83,6 +89,7 @@ private:
   MonitorElement* h_numSkippedLayers_;
   MonitorElement* h_numSimDoubletsPerTrackingParticle_;
   MonitorElement* h_numLayersPerTrackingParticle_;
+  MonitorElement* h_numMissedLayersPerTrackingParticle_;
   MonitorElement* h_numTPTotVsPt_;
   MonitorElement* h_numTPPassVsPt_;
   MonitorElement* h_numTPTotVsEta_;
@@ -159,9 +166,27 @@ namespace simdoublets {
 
   template <typename T>
   bool haveCommonElement(std::vector<T> const& v1, std::vector<T> const& v2) {
-    return std::find_first_of (v1.begin(), v1.end(),
-                               v2.begin(), v2.end()) != v1.end();
+    return std::find_first_of(v1.begin(), v1.end(), v2.begin(), v2.end()) != v1.end();
   }
+
+  std::vector<uint8_t> getBarrelMissingLayerIds(const std::vector<uint8_t>& layerIds) {
+    std::vector<uint8_t> missingLayerIds;
+    for (uint8_t i = 0; i < 4; ++i) {
+      if (std::find(layerIds.begin(), layerIds.end(), i) == layerIds.end()) {
+        missingLayerIds.push_back(i);
+      }
+    }
+    return missingLayerIds;
+  }
+
+  std::vector<DetId> getRecHitsDetIds(const SiPixelRecHitRefVector& recHits) {
+    std::vector<DetId> detIds;
+    for (const auto& recHit : recHits) {
+      detIds.push_back(recHit->geographicalId());
+    }
+    return detIds;
+  }
+
 }  // namespace simdoublets
 
 //
@@ -187,7 +212,9 @@ static const size_t numLayerPairs = layerPairId2Index.size();
 // -------------------------------
 SimDoubletsAnalyzer::SimDoubletsAnalyzer(const edm::ParameterSet& iConfig)
     : geometry_getToken_(esConsumes<TrackerGeometry, TrackerDigiGeometryRecord, edm::Transition::BeginRun>()),
+      topology_getToken_(esConsumes<TrackerTopology, TrackerTopologyRcd, edm::Transition::BeginRun>()),
       simDoublets_getToken_(consumes(iConfig.getParameter<edm::InputTag>("simDoubletsSrc"))),
+      siPixelClusters_getToken_(consumes(iConfig.getParameter<edm::InputTag>("siPixelClustersSrc"))),
       cellMinz_(iConfig.getParameter<std::vector<double>>("cellMinz")),
       cellMaxz_(iConfig.getParameter<std::vector<double>>("cellMaxz")),
       cellPhiCuts_(iConfig.getParameter<std::vector<int>>("cellPhiCuts")),
@@ -217,6 +244,7 @@ SimDoubletsAnalyzer::~SimDoubletsAnalyzer() {}
 
 void SimDoubletsAnalyzer::dqmBeginRun(const edm::Run& iRun, const edm::EventSetup& iSetup) {
   trackerGeometry_ = &iSetup.getData(geometry_getToken_);
+  trackerTopology_ = &iSetup.getData(topology_getToken_);
 }
 
 void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup) {
@@ -226,6 +254,7 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
 
   // get simDoublets
   SimDoubletsCollection const& simDoubletsCollection = iEvent.get(simDoublets_getToken_);
+  edmNew::DetSetVector<SiPixelCluster> const& siPixelClusters = iEvent.get(siPixelClusters_getToken_);
 
   // create vectors for inner and outer RecHits of SimDoublets passing all cuts
   std::vector<SiPixelRecHitRef> innerRecHitsPassing;
@@ -241,11 +270,53 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
     auto doublets = simDoublets.getSimDoublets(trackerGeometry_);
 
     int numSimDoublets = doublets.size();
-    float weight = 1./float(numSimDoublets);
+    float weight = 1. / float(numSimDoublets);
 
     // fill histograms for number of SimDoublets
     h_numSimDoubletsPerTrackingParticle_->Fill(numSimDoublets);
     h_numLayersPerTrackingParticle_->Fill(simDoublets.numLayers());
+
+    // get all detIds of the RecHits of the SimDoublets
+    auto recHitsDetIds = simdoublets::getRecHitsDetIds(simDoublets.recHits());
+    // get the missing layers for the TrackingParticle
+    auto missingLayers = simdoublets::getBarrelMissingLayerIds(simDoublets.layerIds());
+
+    // Find clusters that have no corresponding RecHits
+    bool printRecHits = false;
+    edmNew::DetSetVector<SiPixelCluster>::const_iterator it;
+    for (it = siPixelClusters.begin(); it != siPixelClusters.end(); ++it) {
+      auto clusterDetId = it->detId();
+      const GeomDetUnit* geomDetUnit = trackerGeometry_->idToDetUnit(clusterDetId);
+      const unsigned int layer = trackerTopology_->pxbLayer(geomDetUnit->geographicalId());
+      const unsigned int ladder = trackerTopology_->pxbLadder(geomDetUnit->geographicalId());
+      const unsigned int module = trackerTopology_->pxbModule(geomDetUnit->geographicalId());
+      for (const SiPixelCluster& cluster : *it) {
+        bool missingLayer = std::find(missingLayers.begin(), missingLayers.end(), layer) != missingLayers.end();
+        bool missingDetId = std::find(recHitsDetIds.begin(), recHitsDetIds.end(), clusterDetId) == recHitsDetIds.end();
+        if (missingLayer && missingDetId) {
+          printRecHits = true;
+          std::cout << "Found cluster in (layer, ladder, module, detId): (" << layer << ", " << ladder << ", " << module
+                    << ", " << clusterDetId << ") where no TP recHits were produced!" << std::endl;
+          std::cout << "Cluster size: " << cluster.size() << ", cluster position (x,y): (" << cluster.x() << ", "
+                    << cluster.y() << ")" << std::endl;
+          h_numMissedLayersPerTrackingParticle_->Fill(layer);
+        }
+      }
+    }
+    // print RecHits for TPs with at least a cluster without a recHit
+    if (printRecHits) {
+      std::cout << "RecHits for this TrackingParticle:" << std::endl;
+      for (const auto& recHit : simDoublets.recHits()) {
+        auto id = recHit->geographicalId();
+        const unsigned int layer = trackerTopology_->pxbLayer(id);
+        const unsigned int ladder = trackerTopology_->pxbLadder(id);
+        const unsigned int module = trackerTopology_->pxbModule(id);
+        std::cout << "(layer, ladder, module, detId): (" << layer << ", " << ladder << ", " << module << ", " << id
+                  << ")" << std::endl;
+        std::cout << "recHit local position:" << recHit->localPosition()
+                  << ", recHit global position:" << recHit->globalPosition() << std::endl;
+      }
+    }
 
     // fill histograms for number of TrackingParticles
     h_numTPTotVsPt_->Fill(true_pT);
@@ -419,7 +490,7 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
     }  // end loop over those doublets
 
     // Now check if the TrackingParticle is reconstructable by at least two conencted SimDoublets surviving the cuts
-    if (simdoublets::haveCommonElement<SiPixelRecHitRef>(innerRecHitsPassing, outerRecHitsPassing)){
+    if (simdoublets::haveCommonElement<SiPixelRecHitRef>(innerRecHitsPassing, outerRecHitsPassing)) {
       h_numTPPassVsPt_->Fill(true_pT);
       h_numTPPassVsEta_->Fill(true_eta);
     }
@@ -458,6 +529,13 @@ void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run cons
                    29,
                    -0.5,
                    28.5);
+  h_numMissedLayersPerTrackingParticle_ =
+      ibook.book1D("numMissedLayersPerTrackingParticle",
+                   "Number of missed layers by Tracking Particle; Layer ID; Number of "
+                   "Tracking Particles",
+                   5,
+                   0,
+                   5);
   h_numTPTotVsPt_ = simdoublets::make1DLogX(
       ibook,
       "numTPTotVsPt",
@@ -492,13 +570,14 @@ void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run cons
       pTNBins,
       pTmin,
       pTmax);
-  h_numPassVsPt_ = simdoublets::make1DLogX(ibook,
-                                           "numPassVsPt",
-                                           "Weighted number of passing SimDoublets; True transverse momentum p_{T} [GeV]; "
-                                           "Number of SimDoublets passing all cuts",
-                                           pTNBins,
-                                           pTmin,
-                                           pTmax);
+  h_numPassVsPt_ =
+      simdoublets::make1DLogX(ibook,
+                              "numPassVsPt",
+                              "Weighted number of passing SimDoublets; True transverse momentum p_{T} [GeV]; "
+                              "Number of SimDoublets passing all cuts",
+                              pTNBins,
+                              pTmin,
+                              pTmax);
   h_numTotVsEta_ = ibook.book1D("numTotVsEta",
                                 "Total number of SimDoublets; True pseudorapidity #eta; Total number of SimDoublets",
                                 etaNBins,
@@ -629,6 +708,7 @@ void SimDoubletsAnalyzer::fillDescriptions(edm::ConfigurationDescriptions& descr
   edm::ParameterSetDescription desc;
   desc.add<std::string>("folder", "Tracking/TrackingMCTruth/SimDoublets");
   desc.add<edm::InputTag>("simDoubletsSrc", edm::InputTag("simDoubletsProducer"));
+  desc.add<edm::InputTag>("siPixelClustersSrc", edm::InputTag("hltSiPixelClusters"));
 
   // cutting parameters
   desc.add<std::vector<double>>("cellMinz", std::vector<double>(55, -20.))->setComment("Minimum z for each layer pair");
