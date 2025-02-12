@@ -42,6 +42,8 @@
 #include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
 #include "Geometry/Records/interface/TrackerTopologyRcd.h"
 
+#define CLUSTER_DEBUG
+
 // -------------------------------------------------------------------------------------------------------------
 // class declaration
 // -------------------------------------------------------------------------------------------------------------
@@ -281,12 +283,14 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
     // get the missing layers for the TrackingParticle
     auto missingLayers = simdoublets::getBarrelMissingLayerIds(simDoublets.layerIds());
 
+#ifdef CLUSTER_DEBUG
     // Find clusters that have no corresponding RecHits
     bool printRecHits = false;
     edmNew::DetSetVector<SiPixelCluster>::const_iterator it;
     for (it = siPixelClusters.begin(); it != siPixelClusters.end(); ++it) {
       auto clusterDetId = it->detId();
-      const GeomDetUnit* geomDetUnit = trackerGeometry_->idToDetUnit(clusterDetId);
+      const PixelGeomDetUnit* geomDetUnit =
+          dynamic_cast<const PixelGeomDetUnit*>(trackerGeometry_->idToDetUnit(clusterDetId));
       const unsigned int layer = trackerTopology_->pxbLayer(geomDetUnit->geographicalId());
       const unsigned int ladder = trackerTopology_->pxbLadder(geomDetUnit->geographicalId());
       const unsigned int module = trackerTopology_->pxbModule(geomDetUnit->geographicalId());
@@ -295,10 +299,13 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
         bool missingDetId = std::find(recHitsDetIds.begin(), recHitsDetIds.end(), clusterDetId) == recHitsDetIds.end();
         if (missingLayer && missingDetId) {
           printRecHits = true;
+          LocalPoint clusterLocalPos =
+              geomDetUnit->specificTopology().localPosition(MeasurementPoint(cluster.x(), cluster.y()));
+          GlobalPoint clusterGlobalPos = geomDetUnit->surface().toGlobal(clusterLocalPos);
           std::cout << "Found cluster in (layer, ladder, module, detId): (" << layer << ", " << ladder << ", " << module
                     << ", " << clusterDetId << ") where no TP recHits were produced!" << std::endl;
-          std::cout << "Cluster size: " << cluster.size() << ", cluster position (x,y): (" << cluster.x() << ", "
-                    << cluster.y() << ")" << std::endl;
+          std::cout << "Cluster size: " << cluster.size() << ", local position:" << clusterLocalPos
+                    << ", global position:" << clusterGlobalPos << std::endl;
           h_numMissedLayersPerTrackingParticle_->Fill(layer);
         }
       }
@@ -306,17 +313,21 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
     // print RecHits for TPs with at least a cluster without a recHit
     if (printRecHits) {
       std::cout << "RecHits for this TrackingParticle:" << std::endl;
+      int i = 1;
       for (const auto& recHit : simDoublets.recHits()) {
         auto id = recHit->geographicalId();
         const unsigned int layer = trackerTopology_->pxbLayer(id);
         const unsigned int ladder = trackerTopology_->pxbLadder(id);
         const unsigned int module = trackerTopology_->pxbModule(id);
-        std::cout << "(layer, ladder, module, detId): (" << layer << ", " << ladder << ", " << module << ", " << id
-                  << ")" << std::endl;
+        std::cout << "recHit " << i << " in (layer, ladder, module, detId): (" << layer << ", " << ladder << ", "
+                  << module << ", " << id << ")" << std::endl;
         std::cout << "recHit local position:" << recHit->localPosition()
                   << ", recHit global position:" << recHit->globalPosition() << std::endl;
+        std::cout << "---------------------------------------------------------" << std::endl;
+        ++i;
       }
     }
+#endif
 
     // fill histograms for number of TrackingParticles
     h_numTPTotVsPt_->Fill(true_pT);
