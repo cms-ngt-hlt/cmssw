@@ -264,7 +264,7 @@ void SimDoubletsProducer::produce(edm::Event& event, const edm::EventSetup& even
 
 
 #ifdef SIMDOUBLETS_DEBUG
-  std::cout << "Size of SiPixelRecHitCollection : " << hits.size() << std::endl;
+  std::cout << "Size of SiPixelRecHitCollection : " << hits->size() << std::endl;
   std::cout << count_assoc << " of " << count_totRecHits << " RecHits are associated to selected TrackingParticles (" 
             << count - count_assoc << " of them were associated multiple times)." << std::endl;
   std::cout << "Number of selected TrackingParticles : " << simDoubletsCollection.size() << std::endl;
