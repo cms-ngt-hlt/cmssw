@@ -16,15 +16,15 @@ def _addNoFlow(module):
         if not tmp[ind-1] in _noflowSeen:
             module.noFlowDists.append(tmp[ind-1])
 
-_defaultSubdirs = ["Tracking/TrackingMCTruth/SimDoublets"]
+_defaultSubdirs = ["Tracking/TrackingMCTruth/SimDoublets/general"]
 
 postProcessorSimDoublets = DQMEDHarvester("DQMGenericClient",
     subDirs = cms.untracked.vstring(_defaultSubdirs),
     efficiency = cms.vstring(
-        "efficiency_vs_pT 'SimDoublets efficiency per TP vs p_{T}; TP transverse momentum p_{T} [GeV]; Average fraction of SimDoublets per TP passing all cuts' numPassVsPt numTPTotVsPt",
-        "efficiency_vs_eta 'SimDoublets efficiency vs #eta; TP pseudorapidity #eta; Average fraction of SimDoublets per TP passing all cuts' numPassVsEta numTPTotVsEta",
-        "efficiencyTP_vs_pT 'TrackingParticle efficiency (2 or more connected SimDoublets passing cuts); TP transverse momentum p_{T} [GeV]; Efficiency for TrackingParticles' numTPPassVsPt numTPTotVsPt",
-        "efficiencyTP_vs_eta 'TrackingParticle efficiency (2 or more connected SimDoublets passing cuts); TP pseudorapidity #eta; Efficiency for TrackingParticles' numTPPassVsEta numTPTotVsEta"
+        "efficiency_vs_pT 'SimDoublets efficiency per TP vs p_{T}; TP transverse momentum p_{T} [GeV]; Average fraction of SimDoublets per TP passing all cuts' pass_numVsPt numTPVsPt",
+        "efficiency_vs_eta 'SimDoublets efficiency vs #eta; TP pseudorapidity #eta; Average fraction of SimDoublets per TP passing all cuts' pass_numVsEta numTPVsEta",
+        "efficiencyTP_vs_pT 'TrackingParticle efficiency (2 or more connected SimDoublets passing cuts); TP transverse momentum p_{T} [GeV]; Efficiency for TrackingParticles' pass_numTPVsPt numTPVsPt",
+        "efficiencyTP_vs_eta 'TrackingParticle efficiency (2 or more connected SimDoublets passing cuts); TP pseudorapidity #eta; Efficiency for TrackingParticles' pass_numTPVsEta numTPVsEta"
     ),
     resolution = cms.vstring(),
     cumulativeDists = cms.untracked.vstring(),
