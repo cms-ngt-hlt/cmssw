@@ -1,3 +1,5 @@
+// #define SIMDOUBLETS_DEBUG
+
 #include "DataFormats/GeometryVector/interface/GlobalPoint.h"
 #include "DataFormats/GeometryVector/interface/GlobalVector.h"
 #include "DataFormats/TrackerRecHit2D/interface/SiPixelRecHit.h"
@@ -221,8 +223,7 @@ void SimDoubletsProducer::produce(edm::Event& event, const edm::EventSetup& even
 
 
   // loop over pixel RecHit collections of the different pixel modules
-  int count_totRecHits = 0;
-  int count = 0;
+  int count_totRecHits {0}, count_assoc {0}, count {0};
   for (const auto& detSet : *hits) {
     // determine layer Id
     unsigned int layerId = simdoublets::getLayerId(detSet.detId(), trackerTopology_);
@@ -241,7 +242,7 @@ void SimDoubletsProducer::produce(edm::Event& event, const edm::EventSetup& even
           // if the associated TrackingParticle is among the selected ones
           if (selectedTrackingParticleKeys.has(assocTrackingParticle.key())) {
             SiPixelRecHitRef hitRef = edmNew::makeRefTo(hits, &hit);
-
+            count_assoc++;
             // loop over collection of SimDoublets and find the one of the associated TrackingParticle
             for (auto& simDoublets : simDoubletsCollection){
               TrackingParticleRef trackingParticleRef = simDoublets.trackingParticle();
@@ -260,6 +261,16 @@ void SimDoubletsProducer::produce(edm::Event& event, const edm::EventSetup& even
   for (auto& simDoublets : simDoubletsCollection){
     simDoublets.sortRecHits(trackerGeometry_);
   }
+
+
+#ifdef SIMDOUBLETS_DEBUG
+  std::cout << "Size of SiPixelRecHitCollection : " << hits.size() << std::endl;
+  std::cout << count_assoc << " of " << count_totRecHits << " RecHits are associated to selected TrackingParticles (" 
+            << count - count_assoc << " of them were associated multiple times)." << std::endl;
+  std::cout << "Number of selected TrackingParticles : " << simDoubletsCollection.size() << std::endl;
+  std::cout << "Size of TrackingParticle Collection  : " << trackingParticles->size() << std::endl;
+#endif
+
   
   // put the produced simDoublets collection in the event
   event.emplace(simDoublets_putToken_, std::move(simDoubletsCollection));
