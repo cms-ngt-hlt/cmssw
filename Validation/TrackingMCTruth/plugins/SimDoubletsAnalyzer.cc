@@ -16,6 +16,7 @@
 //
 //
 
+#include <cstddef>
 #include <string>
 #include <map>
 #include <vector>
@@ -42,12 +43,13 @@
 #include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
 #include "Geometry/Records/interface/TrackerTopologyRcd.h"
 
-#define CLUSTER_DEBUG
+// #define CLUSTER_DEBUG
 
 // -------------------------------------------------------------------------------------------------------------
 // class declaration
 // -------------------------------------------------------------------------------------------------------------
 
+template <typename TrackerTraits>
 class SimDoubletsAnalyzer : public DQMEDAnalyzer {
 public:
   explicit SimDoubletsAnalyzer(const edm::ParameterSet&);
@@ -69,6 +71,10 @@ private:
   const edm::ESGetToken<TrackerTopology, TrackerTopologyRcd> topology_getToken_;
   const edm::EDGetTokenT<SimDoubletsCollection> simDoublets_getToken_;
   const edm::EDGetTokenT<edmNew::DetSetVector<SiPixelCluster>> siPixelClusters_getToken_;
+
+  // map that takes the layerPairId as defined in the SimDoublets
+  // and gives the position of the histogram in the histogram vector
+  std::map<int, int> layerPairId2Index_;
 
   // cutting parameters
   std::vector<double> cellMinz_;
@@ -203,28 +209,11 @@ namespace simdoublets {
 
 }  // namespace simdoublets
 
-//
-// static data member definitions
-//
-// map that takes the layerPairId as defined in the SimDoublets
-// and gives the position of the histogram in the histogram vector
-// NOTE: It is absolutely necessary that the map is sorted here,
-// otherwise the histograms will not be labeled corresponding to the correct layer pair but are mixed up
-static const std::map<int, int> layerPairId2Index{
-    {1, 0},     {4, 1},     {16, 2},    {102, 3},   {104, 4},   {116, 5},   {203, 6},   {204, 7},   {216, 8},
-    {405, 9},   {506, 10},  {607, 11},  {708, 12},  {809, 13},  {910, 14},  {1011, 15}, {1617, 16}, {1718, 17},
-    {1819, 18}, {1920, 19}, {2021, 20}, {2122, 21}, {2223, 22}, {2, 23},    {5, 24},    {17, 25},   {6, 26},
-    {18, 27},   {103, 28},  {105, 29},  {117, 30},  {106, 31},  {118, 32},  {1112, 33}, {1213, 34}, {1314, 35},
-    {1415, 36}, {2324, 37}, {2425, 38}, {2526, 39}, {2627, 40}, {406, 41},  {507, 42},  {608, 43},  {709, 44},
-    {810, 45},  {911, 46},  {1012, 47}, {1618, 48}, {1719, 49}, {1820, 50}, {1921, 51}, {2022, 52}, {2123, 53},
-    {2224, 54}, {1315, 55}, {217, 56},  {205, 57},  {2325, 58}, {1113, 59}, {2426, 60}, {1214, 61}, {2527, 62}};
-
-static const size_t numLayerPairs = layerPairId2Index.size();
-
 // -------------------------------
 // constructors and destructor
 // -------------------------------
-SimDoubletsAnalyzer::SimDoubletsAnalyzer(const edm::ParameterSet& iConfig)
+template <typename TrackerTraits>
+SimDoubletsAnalyzer<TrackerTraits>::SimDoubletsAnalyzer(const edm::ParameterSet& iConfig)
     : geometry_getToken_(esConsumes<TrackerGeometry, TrackerDigiGeometryRecord, edm::Transition::BeginRun>()),
       topology_getToken_(esConsumes<TrackerTopology, TrackerTopologyRcd, edm::Transition::BeginRun>()),
       simDoublets_getToken_(consumes(iConfig.getParameter<edm::InputTag>("simDoubletsSrc"))),
@@ -241,6 +230,18 @@ SimDoubletsAnalyzer::SimDoubletsAnalyzer(const edm::ParameterSet& iConfig)
       cellZ0Cut_(iConfig.getParameter<double>("cellZ0Cut")),
       cellPtCut_(iConfig.getParameter<double>("cellPtCut")),
       folder_(iConfig.getParameter<std::string>("folder")) {
+  // get layer pairs of reconstruction from configuration
+  std::vector<int> layerPairs{iConfig.getParameter<std::vector<int>>("layerPairs")};
+
+  // number of layer pairs in reconstruction
+  size_t numLayerPairs = layerPairs.size() / 2;
+
+  // fill the map of layer pairs
+  for (size_t i{0}; i < numLayerPairs; i++) {
+    int layerPairId = 100 * layerPairs[2 * i] + layerPairs[2 * i + 1];
+    layerPairId2Index_.insert({layerPairId, i});
+  }
+
   hVector_dr_.resize(numLayerPairs);
   hVector_dphi_.resize(numLayerPairs);
   hVector_idphi_.resize(numLayerPairs);
@@ -253,18 +254,21 @@ SimDoubletsAnalyzer::SimDoubletsAnalyzer(const edm::ParameterSet& iConfig)
   hVector_pass_innerZ_.resize(numLayerPairs);
 }
 
-SimDoubletsAnalyzer::~SimDoubletsAnalyzer() {}
+template <typename TrackerTraits>
+SimDoubletsAnalyzer<TrackerTraits>::~SimDoubletsAnalyzer() {}
 
 // -----------------------
 // member functions
 // -----------------------
 
-void SimDoubletsAnalyzer::dqmBeginRun(const edm::Run& iRun, const edm::EventSetup& iSetup) {
+template <typename TrackerTraits>
+void SimDoubletsAnalyzer<TrackerTraits>::dqmBeginRun(const edm::Run& iRun, const edm::EventSetup& iSetup) {
   trackerGeometry_ = &iSetup.getData(geometry_getToken_);
   trackerTopology_ = &iSetup.getData(topology_getToken_);
 }
 
-void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup) {
+template <typename TrackerTraits>
+void SimDoubletsAnalyzer<TrackerTraits>::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup) {
   using namespace edm;
 
   eventCount_++;
@@ -397,12 +401,12 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
 
       // first, get layer pair Id and exclude layer pairs that are not considered
       int layerPairId = doublet.layerPairId();
-      if (layerPairId2Index.find(layerPairId) == layerPairId2Index.end()) {
+      if (layerPairId2Index_.find(layerPairId) == layerPairId2Index_.end()) {
         continue;
       }
 
       // get the position of the layer pair in the vectors of histograms
-      int layerPairIdIndex = layerPairId2Index.at(layerPairId);
+      int layerPairIdIndex = layerPairId2Index_.at(layerPairId);
 
       // dr = (outer_r - inner_r) histogram
       hVector_dr_[layerPairIdIndex]->Fill(dr);
@@ -562,7 +566,10 @@ void SimDoubletsAnalyzer::analyze(const edm::Event& iEvent, const edm::EventSetu
   }  // end loop over SimDoublets (= loop over TrackingParticles)
 }
 
-void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run const& run, edm::EventSetup const& iSetup) {
+template <typename TrackerTraits>
+void SimDoubletsAnalyzer<TrackerTraits>::bookHistograms(DQMStore::IBooker& ibook,
+                                                        edm::Run const& run,
+                                                        edm::EventSetup const& iSetup) {
   // set some common parameters
   int pTNBins = 50;
   double pTmin = log10(0.01);
@@ -578,10 +585,22 @@ void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run cons
   ibook.setCurrentFolder(folder_ + "/general");
 
   // overview histograms
-  h_layerPairs_ = ibook.book2D(
-      "layerPairs", "Layer pairs in SimDoublets; Inner layer ID; Outer layer ID", 28, -0.5, 27.5, 28, -0.5, 27.5);
-  h_pass_layerPairs_ = ibook.book2D(
-      "pass_layerPairs", "Layer pairs in SimDoublets passing all cuts; Inner layer ID; Outer layer ID", 28, -0.5, 27.5, 28, -0.5, 27.5);
+  h_layerPairs_ = ibook.book2D("layerPairs",
+                               "Layer pairs in SimDoublets; Inner layer ID; Outer layer ID",
+                               28,
+                               -0.5,
+                               27.5,
+                               28,
+                               -0.5,
+                               -0.5 + TrackerTraits::numberOfLayers);
+  h_pass_layerPairs_ = ibook.book2D("pass_layerPairs",
+                                    "Layer pairs in SimDoublets passing all cuts; Inner layer ID; Outer layer ID",
+                                    28,
+                                    -0.5,
+                                    27.5,
+                                    28,
+                                    -0.5,
+                                    -0.5 + TrackerTraits::numberOfLayers);
   h_numSkippedLayers_ = ibook.book1D(
       "numSkippedLayers", "Number of skipped layers; Number of skipped layers; Number of SimDoublets", 16, -1.5, 14.5);
   h_numSimDoubletsPerTrackingParticle_ =
@@ -611,13 +630,13 @@ void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run cons
       pTmin,
       pTmax);
   h_pass_numTPVsPt_ = simdoublets::make1DLogX(ibook,
-                                             "pass_numTPVsPt",
-                                             "Reconstructable TrackingParticles (two or more connected SimDoublets "
-                                             "pass cuts); True transverse momentum p_{T} [GeV]; "
-                                             "Number of reconstructable TrackingParticles",
-                                             pTNBins,
-                                             pTmin,
-                                             pTmax);
+                                              "pass_numTPVsPt",
+                                              "Reconstructable TrackingParticles (two or more connected SimDoublets "
+                                              "pass cuts); True transverse momentum p_{T} [GeV]; "
+                                              "Number of reconstructable TrackingParticles",
+                                              pTNBins,
+                                              pTmin,
+                                              pTmax);
   h_numTPVsEta_ =
       ibook.book1D("numTPVsEta",
                    "Total number of TrackingParticles; True pseudorapidity #eta; Total number of TrackingParticles",
@@ -625,11 +644,11 @@ void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run cons
                    etamin,
                    etamax);
   h_pass_numTPVsEta_ = ibook.book1D("pass_numTPVsEta",
-                                   "Reconstructable TrackingParticles (two or more connected SimDoublets "
-                                   "pass cuts); True pseudorapidity #eta; Number of reconstructable TrackingParticles",
-                                   etaNBins,
-                                   etamin,
-                                   etamax);
+                                    "Reconstructable TrackingParticles (two or more connected SimDoublets "
+                                    "pass cuts); True pseudorapidity #eta; Number of reconstructable TrackingParticles",
+                                    etaNBins,
+                                    etamin,
+                                    etamax);
   h_numVsPt_ = simdoublets::make1DLogX(
       ibook,
       "numVsPt",
@@ -646,10 +665,10 @@ void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run cons
                               pTmin,
                               pTmax);
   h_numVsEta_ = ibook.book1D("numVsEta",
-                                "Total number of SimDoublets; True pseudorapidity #eta; Total number of SimDoublets",
-                                etaNBins,
-                                etamin,
-                                etamax);
+                             "Total number of SimDoublets; True pseudorapidity #eta; Total number of SimDoublets",
+                             etaNBins,
+                             etamin,
+                             etamax);
   h_pass_numVsEta_ =
       ibook.book1D("pass_numVsEta",
                    "Weighted number of SimDoublets; True pseudorapidity #eta; Number of SimDoublets passing all cuts",
@@ -763,7 +782,7 @@ void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run cons
   // -----------------------------------------------------------------------
 
   // loop through valid layer pairs and add for each one booked hist per vector
-  for (auto id = layerPairId2Index.begin(); id != layerPairId2Index.end(); ++id) {
+  for (auto id = layerPairId2Index_.begin(); id != layerPairId2Index_.end(); ++id) {
     // get the position of the layer pair in the histogram vectors
     int layerPairIdIndex = id->second;
 
@@ -858,27 +877,112 @@ void SimDoubletsAnalyzer::bookHistograms(DQMStore::IBooker& ibook, edm::Run cons
   }
 }
 
-void SimDoubletsAnalyzer::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+// -----------------------------------------------------------------------
+// fillDescriptions
+// -----------------------------------------------------------------------
+
+namespace simdoublets {
+  // fillDescriptionsCommon: description that is identical for Phase 1 and 2
+  template <typename TrackerTraits>
+  void fillDescriptionsCommon(edm::ParameterSetDescription& desc) {
+    desc.add<std::string>("folder", "Tracking/TrackingMCTruth/SimDoublets");
+    desc.add<edm::InputTag>("siPixelClustersSrc", edm::InputTag("hltSiPixelClusters"));
+
+    // cut parameters with scalar values
+    desc.add<int>("cellMaxDYSize12", TrackerTraits::maxDYsize12)
+        ->setComment("Maximum difference in cluster size for B1/B2");
+    desc.add<int>("cellMaxDYSize", TrackerTraits::maxDYsize)->setComment("Maximum difference in cluster size");
+    desc.add<int>("cellMaxDYPred", TrackerTraits::maxDYPred)
+        ->setComment("Maximum difference between actual and expected cluster size of inner RecHit");
+  }
+
+}  // namespace simdoublets
+
+// dummy default fillDescription
+template <typename TrackerTraits>
+void SimDoubletsAnalyzer<TrackerTraits>::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
-  desc.add<std::string>("folder", "Tracking/TrackingMCTruth/SimDoublets");
-  desc.add<edm::InputTag>("simDoubletsSrc", edm::InputTag("simDoubletsProducer"));
-  desc.add<edm::InputTag>("siPixelClustersSrc", edm::InputTag("hltSiPixelClusters"));
+  descriptions.addWithDefaultLabel(desc);
+}
+
+// fillDescription for Phase 1
+template <>
+void SimDoubletsAnalyzer<pixelTopology::Phase1>::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+  edm::ParameterSetDescription desc;
+  simdoublets::fillDescriptionsCommon<pixelTopology::Phase1>(desc);
+  
+  // input source for SimDoublets
+  desc.add<edm::InputTag>("simDoubletsSrc", edm::InputTag("simDoubletsProducerPhase1"));
+
+  // layer pairs in reconstruction
+  desc.add<std::vector<int>>(
+          "layerPairs", std::vector<int>(std::begin(phase1PixelTopology::layerPairs), std::end(phase1PixelTopology::layerPairs)))
+      ->setComment(
+          "Array of length 2*NumberOfPairs where the elements at 2i and 2i+1 are the inner and outer layers of layer "
+          "pair i");
 
   // cutting parameters
-  desc.add<std::vector<double>>("cellMinz", std::vector<double>(55, -20.))->setComment("Minimum z for each layer pair");
-  desc.add<std::vector<double>>("cellMaxz", std::vector<double>(55, 20.))->setComment("Maximum z for each layer pair");
-  desc.add<std::vector<int>>("cellPhiCuts", std::vector<int>(55, 20))->setComment("Cuts in phi for cells");
-  desc.add<std::vector<double>>("cellMaxr", std::vector<double>(55, 20.))->setComment("Cut for dr of cells");
-  desc.add<int>("cellMinYSizeB1", 25)->setComment("Minimum cluster size for B1");
-  desc.add<int>("cellMinYSizeB2", 15)->setComment("Minimum cluster size for B2");
-  desc.add<int>("cellMaxDYSize12", 12)->setComment("Maximum cluster size difference for B1/B2");
-  desc.add<int>("cellMaxDYSize", 10)->setComment("Maximum cluster size difference");
-  desc.add<int>("cellMaxDYPred", 20)->setComment("Maximum cluster size difference prediction");
-  desc.add<double>("cellZ0Cut", 7.5)->setComment("Maximum longitudinal impact parameter");
-  desc.add<double>("cellPtCut", 0.85)->setComment("Minimum tranverse momentum");
+  desc.add<int>("cellMinYSizeB1", 1)->setComment("Minimum cluster size for inner RecHit from B1");
+  desc.add<int>("cellMinYSizeB2", 1)->setComment("Minimum cluster size for inner RecHit not from B1");
+  desc.add<double>("cellZ0Cut", 12.0)->setComment("Maximum longitudinal impact parameter");
+  desc.add<double>("cellPtCut", 0.5)->setComment("Minimum tranverse momentum");
+  desc.add<std::vector<double>>("cellMinz",
+                                std::vector<double>(std::begin(phase1PixelTopology::minz), std::end(phase1PixelTopology::minz)))
+      ->setComment("Minimum z of inner RecHit for each layer pair");
+  desc.add<std::vector<double>>("cellMaxz",
+                                std::vector<double>(std::begin(phase1PixelTopology::maxz), std::end(phase1PixelTopology::maxz)))
+      ->setComment("Maximum z of inner RecHit for each layer pair");
+  desc.add<std::vector<int>>("cellPhiCuts",
+                             std::vector<int>(std::begin(phase1PixelTopology::phicuts), std::end(phase1PixelTopology::phicuts)))
+      ->setComment("Cuts in delta phi for cells");
+  desc.add<std::vector<double>>("cellMaxr",
+                                std::vector<double>(std::begin(phase1PixelTopology::maxr), std::end(phase1PixelTopology::maxr)))
+      ->setComment("Cut for dr of cells");
 
   descriptions.addWithDefaultLabel(desc);
 }
 
+// fillDescription for Phase 2
+template <>
+void SimDoubletsAnalyzer<pixelTopology::Phase2>::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+  edm::ParameterSetDescription desc;
+  simdoublets::fillDescriptionsCommon<pixelTopology::Phase2>(desc);
+
+  // input source for SimDoublets
+  desc.add<edm::InputTag>("simDoubletsSrc", edm::InputTag("simDoubletsProducerPhase2"));
+
+  // layer pairs in reconstruction
+  desc.add<std::vector<int>>(
+          "layerPairs", std::vector<int>(std::begin(phase2PixelTopology::layerPairs), std::end(phase2PixelTopology::layerPairs)))
+      ->setComment(
+          "Array of length 2*NumberOfPairs where the elements at 2i and 2i+1 are the inner and outer layers of layer "
+          "pair i");
+
+  // cutting parameters
+  desc.add<int>("cellMinYSizeB1", 25)->setComment("Minimum cluster size for inner RecHit from B1");
+  desc.add<int>("cellMinYSizeB2", 15)->setComment("Minimum cluster size for inner RecHit not from B1");
+  desc.add<double>("cellZ0Cut", 7.5)->setComment("Maximum longitudinal impact parameter");
+  desc.add<double>("cellPtCut", 0.85)->setComment("Minimum tranverse momentum");
+  desc.add<std::vector<double>>("cellMinz",
+                                std::vector<double>(std::begin(phase2PixelTopology::minz), std::end(phase2PixelTopology::minz)))
+      ->setComment("Minimum z of inner RecHit for each layer pair");
+  desc.add<std::vector<double>>("cellMaxz",
+                                std::vector<double>(std::begin(phase2PixelTopology::maxz), std::end(phase2PixelTopology::maxz)))
+      ->setComment("Maximum z of inner RecHit for each layer pair");
+  desc.add<std::vector<int>>("cellPhiCuts",
+                             std::vector<int>(std::begin(phase2PixelTopology::phicuts), std::end(phase2PixelTopology::phicuts)))
+      ->setComment("Cuts in delta phi for cells");
+  desc.add<std::vector<double>>("cellMaxr",
+                                std::vector<double>(std::begin(phase2PixelTopology::maxr), std::end(phase2PixelTopology::maxr)))
+      ->setComment("Cut for dr of cells");
+
+  descriptions.addWithDefaultLabel(desc);
+}
+
+// define two plugins for Phase 1 and 2
+using SimDoubletsAnalyzerPhase1 = SimDoubletsAnalyzer<pixelTopology::Phase1>;
+using SimDoubletsAnalyzerPhase2 = SimDoubletsAnalyzer<pixelTopology::Phase2>;
+
 // define this as a plug-in
-DEFINE_FWK_MODULE(SimDoubletsAnalyzer);
+DEFINE_FWK_MODULE(SimDoubletsAnalyzerPhase1);
+DEFINE_FWK_MODULE(SimDoubletsAnalyzerPhase2);

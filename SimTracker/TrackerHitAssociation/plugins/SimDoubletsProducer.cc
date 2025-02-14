@@ -44,11 +44,23 @@
 
 /** @brief Produces SimDoublets (MC-info based PixelRecHit doublets) for selected TrackingParticles.
  *
- * DESCRIPTION FIXME
+ * SimDoublets represent the true doublets of RecHits that a simulated particle (TrackingParticle) 
+ * created in the pixel detector. They can be used to analyze cuts which are applied in the reconstruction
+ * when producing doublets as the first part of patatrack pixel tracking.
+ *
+ * The SimDoublets are produced in the following way:
+ * 1. We select reasonable TrackingParticles accorrding to the criteria given in the config file as 
+ *    "TrackingParticleSelectionConfig".
+ * 2. For each selected particle, we create append a new SimDoublets object to the SimDoubletsCollection.
+ * 3. We loop over all RecHits in the pixel tracker and check if the given RecHit is associated to one of
+ *    the selected particles (association via TP to cluster association). If it is, we add a RecHit reference
+ *    to the respective SimDoublet.
+ * 4. In the end, we sort the RecHits in each SimDoublet object according to their global position.
  *
  * @author Jan Schulz (jan.gerrit.schulz@cern.ch)
  * @date Dec 2024
  */
+template <typename TrackerTraits>
 class SimDoubletsProducer : public edm::stream::EDProducer<> {
 public:
   explicit SimDoubletsProducer(const edm::ParameterSet&);
@@ -73,21 +85,27 @@ private:
 
 
 namespace simdoublets {
-  // function that determines the layerId from the detId for Phase-2
+  // function that determines the layerId from the detId for Phase 1 and 2
+  template <typename TrackerTraits>
   unsigned int getLayerId(DetId const& detId, const TrackerTopology* trackerTopology) {
+    // number of barrel layers
+    constexpr unsigned int numBarrelLayers {4};
+    // number of disks per endcap
+    constexpr unsigned int numEndcapDisks = (TrackerTraits::numberOfLayers - numBarrelLayers) / 2;
+
     // set default to 999 (invalid)
     unsigned int layerId {999};
 
     if (detId.subdetId() == PixelSubdetector::PixelBarrel) {
-      // subtract 1 in the barrel to get from (1,4) to (0,3)
+      // subtract 1 in the barrel to get, e.g. for Phase 2, from (1,4) to (0,3)
       layerId = trackerTopology->pxbLayer(detId) - 1;
     } else if (detId.subdetId() == PixelSubdetector::PixelEndcap) {
       if (trackerTopology->pxfSide(detId) == 1) {
-        // add 15 in the backward endcap to get from (1,12) to (16,27)
-        layerId = 15 + trackerTopology->pxfDisk(detId);
+        // add offset in the backward endcap to get, e.g. for Phase 2, from (1,12) to (16,27)
+        layerId = trackerTopology->pxfDisk(detId) + numBarrelLayers + numEndcapDisks - 1;
       } else {
-        // add 3 in the forward endcap to get from (1,12) to (4,15)
-        layerId = 3 + trackerTopology->pxfDisk(detId);
+        // add offest in the forward endcap to get, e.g. for Phase 2, from (1,12) to (4,15)
+        layerId = trackerTopology->pxfDisk(detId) + numBarrelLayers - 1;
       }
     }
     // return the determined Id
@@ -98,8 +116,8 @@ namespace simdoublets {
 
 
 
-
-SimDoubletsProducer::SimDoubletsProducer(const edm::ParameterSet& pSet)
+template <typename TrackerTraits>
+SimDoubletsProducer<TrackerTraits>::SimDoubletsProducer(const edm::ParameterSet& pSet)
     : geometry_getToken_(esConsumes<TrackerGeometry, TrackerDigiGeometryRecord, edm::Transition::BeginRun>()),
       topology_getToken_(esConsumes<TrackerTopology, TrackerTopologyRcd, edm::Transition::BeginRun>()),
       clusterTPAssociation_getToken_(consumes<ClusterTPAssociation>(pSet.getParameter<edm::InputTag>("clusterTPAssociationSrc"))),
@@ -129,8 +147,8 @@ SimDoubletsProducer::SimDoubletsProducer(const edm::ParameterSet& pSet)
 
 
 
-
-void SimDoubletsProducer::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+template <typename TrackerTraits>
+void SimDoubletsProducer<TrackerTraits>::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
   
   // sources for cluster-TrackingParticle association, TrackingParticles and RecHits
@@ -163,16 +181,16 @@ void SimDoubletsProducer::fillDescriptions(edm::ConfigurationDescriptions& descr
 }
 
 
-
-void SimDoubletsProducer::beginRun(const edm::Run& run, const edm::EventSetup& eventSetup) {
+template <typename TrackerTraits>
+void SimDoubletsProducer<TrackerTraits>::beginRun(const edm::Run& run, const edm::EventSetup& eventSetup) {
   // get TrackerGeometry and TrackerTopology
   trackerGeometry_ = &eventSetup.getData(geometry_getToken_);
   trackerTopology_ = &eventSetup.getData(topology_getToken_);
 }
 
 
-
-void SimDoubletsProducer::produce(edm::Event& event, const edm::EventSetup& eventSetup) {
+template <typename TrackerTraits>
+void SimDoubletsProducer<TrackerTraits>::produce(edm::Event& event, const edm::EventSetup& eventSetup) {
 
   // get cluster to TrackingParticle association
   ClusterTPAssociation const& clusterTPAssociation = event.get(clusterTPAssociation_getToken_);
@@ -226,7 +244,7 @@ void SimDoubletsProducer::produce(edm::Event& event, const edm::EventSetup& even
   int count_totRecHits {0}, count_assoc {0}, count {0};
   for (const auto& detSet : *hits) {
     // determine layer Id
-    unsigned int layerId = simdoublets::getLayerId(detSet.detId(), trackerTopology_);
+    unsigned int layerId = simdoublets::getLayerId<TrackerTraits>(detSet.detId(), trackerTopology_);
 
     // loop over RecHits
     for (auto const& hit : detSet) {
@@ -276,5 +294,9 @@ void SimDoubletsProducer::produce(edm::Event& event, const edm::EventSetup& even
   event.emplace(simDoublets_putToken_, std::move(simDoubletsCollection));
 }
 
+// define two plugins for Phase 1 and 2
+using SimDoubletsProducerPhase1 = SimDoubletsProducer<pixelTopology::Phase1>;
+using SimDoubletsProducerPhase2 = SimDoubletsProducer<pixelTopology::Phase2>;
 
-DEFINE_FWK_MODULE(SimDoubletsProducer);
+DEFINE_FWK_MODULE(SimDoubletsProducerPhase1);
+DEFINE_FWK_MODULE(SimDoubletsProducerPhase2);

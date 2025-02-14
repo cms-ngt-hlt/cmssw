@@ -49,16 +49,16 @@ process.load("Validation.RecoTrack.associators_cff")
 ### load hltSiPixelRecHit Producer
 process.load("HLTrigger.Configuration.HLT_75e33.modules.hltSiPixelRecHits_cfi")
 ### load the new EDProducer "SimDoubletsProducer"
-process.load("SimTracker.TrackerHitAssociation.simDoubletsProducer_cfi")
+process.load("SimTracker.TrackerHitAssociation.simDoubletsProducerPhase2_cfi")
 ### load the new DQM EDAnalyzer "SimDoubletsAnalyzer"
-process.load("Validation.TrackingMCTruth.simDoubletsAnalyzer_cfi")
+process.load("Validation.TrackingMCTruth.simDoubletsAnalyzerPhase2_cfi")
 
 ####  set up the paths
 process.simDoubletProduction = cms.Path(
     process.hltTPClusterProducer *
     process.hltSiPixelRecHits *
-    process.simDoubletsProducer *
-    process.simDoubletsAnalyzer
+    process.simDoubletsProducerPhase2 *
+    process.simDoubletsAnalyzerPhase2
 )
 
 # Output definition

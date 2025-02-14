@@ -52,8 +52,9 @@ process.GlobalTag = GlobalTag(process.GlobalTag, 'auto:phase2_realistic_T33', ''
 # Path and EndPath definitions
 process.edmtome_step = cms.Path(process.EDMtoME)
 process.dqmsave_step = cms.Path(process.DQMSaver)
-process.load('DQM.SiTrackerPhase2.Phase2TrackerDQMHarvesting_cff')
+process.load('Validation.TrackingMCTruth.PostProcessorSimDoublets_cff')
+process.harvesting_step = cms.Path(process.postProcessorSimDoublets)
 
 # Schedule definition
-process.schedule = cms.Schedule(process.edmtome_step,process.dqmsave_step)
+process.schedule = cms.Schedule(process.edmtome_step,process.harvesting_step,process.dqmsave_step)
 
