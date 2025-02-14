@@ -1,6 +1,5 @@
 import FWCore.ParameterSet.Config as cms
 from DQMServices.Core.DQMEDHarvester import DQMEDHarvester
-from Configuration.Eras.Modifier_fastSim_cff import fastSim
 
 def _addNoFlow(module):
     _noflowSeen = set()
@@ -29,7 +28,8 @@ postProcessorSimDoublets = DQMEDHarvester("DQMGenericClient",
     resolution = cms.vstring(),
     cumulativeDists = cms.untracked.vstring(),
     noFlowDists = cms.untracked.vstring(),
-    outputFileName = cms.untracked.string("")
+    outputFileName = cms.untracked.string(""),
+    makeGlobalEffienciesPlot = cms.untracked.bool(False)
 )
 
 _addNoFlow(postProcessorSimDoublets)
