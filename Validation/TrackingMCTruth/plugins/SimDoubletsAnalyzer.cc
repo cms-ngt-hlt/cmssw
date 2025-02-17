@@ -922,8 +922,8 @@ void SimDoubletsAnalyzer<pixelTopology::Phase1>::fillDescriptions(edm::Configura
           "pair i");
 
   // cutting parameters
-  desc.add<int>("cellMinYSizeB1", 1)->setComment("Minimum cluster size for inner RecHit from B1");
-  desc.add<int>("cellMinYSizeB2", 1)->setComment("Minimum cluster size for inner RecHit not from B1");
+  desc.add<int>("cellMinYSizeB1", 36)->setComment("Minimum cluster size for inner RecHit from B1");
+  desc.add<int>("cellMinYSizeB2", 28)->setComment("Minimum cluster size for inner RecHit not from B1");
   desc.add<double>("cellZ0Cut", 12.0)->setComment("Maximum longitudinal impact parameter");
   desc.add<double>("cellPtCut", 0.5)->setComment("Minimum tranverse momentum");
   desc.add<std::vector<double>>("cellMinz",
