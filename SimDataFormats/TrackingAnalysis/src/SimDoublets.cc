@@ -1,9 +1,8 @@
 #include "SimDataFormats/TrackingAnalysis/interface/SimDoublets.h"
 
 #include "DataFormats/GeometryVector/interface/GlobalVector.h"
-#include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
 #include "DataFormats/GeometryCommonDetAlgo/interface/MeasurementPoint.h"
-#include "Geometry/TrackerGeometryBuilder/interface/TrackerGeometry.h"
+#include "DataFormats/SiPixelDetId/interface/PixelSubdetector.h"
 
 namespace simdoublets {
 
@@ -33,29 +32,35 @@ namespace simdoublets {
     return (geomDetUnit->surface().toGlobal(localPosition) - beamSpotPosition);
   }
 
-  // function that determines the number of skipped layers for a given pair of layer IDs
-  // layerIds cover the ranges:
-  // 0 to 3 (barrel), 4 to 15 (forward), 16 to 27 (backward)
-  int getNumSkippedLayers(std::pair<uint8_t, uint8_t> const& layerIds) {
-    bool innerInBarrel = (layerIds.first < 4);
-    bool outerInBarrel = (layerIds.second < 4);
-    bool innerInBackward = (layerIds.first > 15);
-    bool outerInBackward = (layerIds.second > 15);
-    bool innerInForward = (!innerInBarrel) && (!innerInBackward);
-    bool outerInForward = (!outerInBarrel) && (!outerInBackward);
-
-    // Possibility 0: invalid case (outer layer is not the outer one), set to -1
+  // function that determines the number of skipped layers for a given pair of RecHits
+  int getNumSkippedLayers(std::pair<uint8_t, uint8_t> const& layerIds,
+                          std::pair<SiPixelRecHitRef, SiPixelRecHitRef> const& recHitRefs,
+                          const TrackerTopology* trackerTopology) {
+    // Possibility 0: invalid case (outer layer is not the outer one), set to -1 immediately
     if (layerIds.first >= layerIds.second) {
       return -1;
     }
+
+    // get the detector Ids of the two RecHits
+    DetId innerDetId(recHitRefs.first->geographicalId());
+    DetId outerDetId(recHitRefs.second->geographicalId());
+
+    // determine where the RecHits are
+    bool innerInBarrel = (innerDetId.subdetId() == PixelSubdetector::PixelBarrel);
+    bool outerInBarrel = (outerDetId.subdetId() == PixelSubdetector::PixelBarrel);
+    bool innerInBackward = (!innerInBarrel) && (trackerTopology->pxfSide(innerDetId) == 1);
+    bool outerInBackward = (!outerInBarrel) && (trackerTopology->pxfSide(outerDetId) == 1);
+    bool innerInForward = (!innerInBarrel) && (!innerInBackward);
+    bool outerInForward = (!outerInBarrel) && (!outerInBackward);
+
     // Possibility 1: both RecHits lie in the same detector part (barrel, forward or backward)
-    else if ((innerInBarrel && outerInBarrel) || (innerInForward && outerInForward) ||
-             (innerInBackward && outerInBackward)) {
+    if ((innerInBarrel && outerInBarrel) || (innerInForward && outerInForward) ||
+        (innerInBackward && outerInBackward)) {
       return (layerIds.second - layerIds.first - 1);
     }
     // Possibility 2: the inner RecHit is in the barrel while the outer is in either forward or backward
     else if (innerInBarrel) {
-      return (outerInForward) ? (layerIds.second - 4) : (layerIds.second - 16);
+      return (trackerTopology->pxfDisk(outerDetId) - 1);
     }
     // Possibility 3: invalid case (one is forward and the other in backward), set to -1
     else {
@@ -69,6 +74,20 @@ namespace simdoublets {
     return (layerIds.first * 100 + layerIds.second);
   }
 
+  // function that checks if the local position of the RecHit is valid or (0,0,0)
+  bool recHitLocalPositionIsInvalid(SiPixelRecHitRef const& recHit) {
+    // check if the local position of the RecHit makes sense or is always (0,0,0)
+    // background is that the local position of RecHit is transient, and therefore not saved to ROOT files
+    // for the check look at the local position of the first RecHit
+    if ((recHit->localPositionFast().x() == 0) && (recHit->localPositionFast().y() == 0)) {
+      // invalid position
+      return true;
+    } else {
+      // valid position
+      return false;
+    }
+  }
+
 }  // end namespace simdoublets
 
 // SimDoublets::Doublet class member function
@@ -79,6 +98,7 @@ SimDoublets::Doublet::Doublet(SimDoublets const& simDoublets,
                               size_t const innerIndex,
                               size_t const outerIndex,
                               const TrackerGeometry* trackerGeometry,
+                              const TrackerTopology* trackerTopology,
                               bool useClusterLocalPosition)
     : trackerGeometry_(trackerGeometry),
       useClusterLocalPosition_(useClusterLocalPosition),
@@ -89,7 +109,7 @@ SimDoublets::Doublet::Doublet(SimDoublets const& simDoublets,
   layerIds_ = std::make_pair(simDoublets.layerIds(innerIndex), simDoublets.layerIds(outerIndex));
 
   // determine number of skipped layers
-  numSkippedLayers_ = simdoublets::getNumSkippedLayers(layerIds_);
+  numSkippedLayers_ = simdoublets::getNumSkippedLayers(layerIds_, recHitRefs_, trackerTopology);
 
   // determine Id of the layer pair
   layerPairId_ = simdoublets::getLayerPairId(layerIds_);
@@ -100,19 +120,17 @@ SimDoublets::Doublet::Doublet(SimDoublets const& simDoublets,
 SimDoublets::Doublet::Doublet(SimDoublets const& simDoublets,
                               size_t const innerIndex,
                               size_t const outerIndex,
-                              const TrackerGeometry* trackerGeometry)
-    : SimDoublets::Doublet::Doublet(simDoublets, innerIndex, outerIndex, trackerGeometry, true) {
+                              const TrackerGeometry* trackerGeometry,
+                              const TrackerTopology* trackerTopology)
+    : SimDoublets::Doublet::Doublet(simDoublets, innerIndex, outerIndex, trackerGeometry, trackerTopology, true) {
   // make sure, that there are RecHits
   if (simDoublets.numRecHits() == 0) {
     return;
   }
 
-  // check if the local position of the RecHit makes sense or is always (0,0,0)
-  // background is that the local position of RecHit is transient, and therefore not saved to ROOT files
-  // for the check look at the local position of the first RecHit
-  SiPixelRecHitRef recHit = simDoublets.recHits(0);
-  if ((recHit->localPositionFast().x() == 0) && (recHit->localPositionFast().y() == 0)) {
-    // if local position is 0, use clusters instead
+  // check if the local position of the RecHit makes sense or is invalid
+  if (simdoublets::recHitLocalPositionIsInvalid(simDoublets.recHits(0))) {
+    // if local position is invalid, use clusters instead
     useClusterLocalPosition_ = true;
   } else {
     // else, prefer to use the RecHit position (as this is what's used in reco)
@@ -172,7 +190,8 @@ void SimDoublets::sortRecHits(const TrackerGeometry* trackerGeometry) {
 }
 
 // method to produce the true doublets on the fly
-std::vector<SimDoublets::Doublet> SimDoublets::getSimDoublets(const TrackerGeometry* trackerGeometry) const {
+std::vector<SimDoublets::Doublet> SimDoublets::getSimDoublets(const TrackerGeometry* trackerGeometry,
+                                                              const TrackerTopology* trackerTopology) const {
   // create output vector for the doublets
   std::vector<SimDoublets::Doublet> doubletVector;
 
@@ -180,6 +199,21 @@ std::vector<SimDoublets::Doublet> SimDoublets::getSimDoublets(const TrackerGeome
   // confirm that the RecHits are sorted
   if (!recHitsAreSorted_) {
     return doubletVector;
+  }
+
+  // check if there are at least two hits
+  if (numRecHits() < 2) {
+    return doubletVector;
+  }
+
+  // check if the local position of the RecHit makes sense or is invalid
+  bool useClusterLocalPosition;
+  if (simdoublets::recHitLocalPositionIsInvalid(recHits(0))) {
+    // if local position is invalid, use clusters instead
+    useClusterLocalPosition = true;
+  } else {
+    // else, prefer to use the RecHit position (as this is what's used in reco)
+    useClusterLocalPosition = false;
   }
 
   // loop over the RecHits/layer Ids
@@ -204,7 +238,8 @@ std::vector<SimDoublets::Doublet> SimDoublets::getSimDoublets(const TrackerGeome
         break;
       }
 
-      doubletVector.push_back(SimDoublets::Doublet(*this, i, j, trackerGeometry));
+      doubletVector.push_back(
+          SimDoublets::Doublet(*this, i, j, trackerGeometry, trackerTopology, useClusterLocalPosition));
     }
   }  // end loop over the RecHits/layer Ids
 

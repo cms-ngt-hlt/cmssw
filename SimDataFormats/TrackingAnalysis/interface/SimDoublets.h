@@ -4,6 +4,7 @@
 #include "DataFormats/TrackerRecHit2D/interface/SiPixelRecHitCollection.h"
 #include "SimDataFormats/TrackingAnalysis/interface/TrackingParticleFwd.h"
 #include "Geometry/TrackerGeometryBuilder/interface/TrackerGeometry.h"
+#include "DataFormats/TrackerCommon/interface/TrackerTopology.h"
 #include "Geometry/CommonDetUnit/interface/PixelGeomDetUnit.h"
 #include "DataFormats/Common/interface/Ref.h"
 #include "DataFormats/Common/interface/RefVector.h"
@@ -57,10 +58,10 @@ public:
     Doublet() {}
 
     // constructor with explicit setting of useClusterLocalPosition_
-    Doublet(SimDoublets const&, size_t const, size_t const, const TrackerGeometry*, bool);
+    Doublet(SimDoublets const&, size_t const, size_t const, const TrackerGeometry*, const TrackerTopology*, bool);
     // constrcutor with automatic setting of useClusterLocalPosition_
     // checks if RecHit localPosition is meaningful: if yes, prefer RecHit localPosition over cluster
-    Doublet(SimDoublets const&, size_t const, size_t const, const TrackerGeometry*);
+    Doublet(SimDoublets const&, size_t const, size_t const, const TrackerGeometry*, const TrackerTopology*);
 
     // method to access the layers pair
     std::pair<uint8_t, uint8_t> layerIds() const { return layerIds_; }
@@ -151,7 +152,7 @@ public:
   void sortRecHits(const TrackerGeometry*);
 
   // method to produce the SimDoublets from the RecHits
-  std::vector<Doublet> getSimDoublets(const TrackerGeometry* trackerGeometry = nullptr) const;
+  std::vector<Doublet> getSimDoublets(const TrackerGeometry* trackerGeometry = nullptr, const TrackerTopology* trackerTopology = nullptr) const;
 
 private:
   TrackingParticleRef trackingParticleRef_;  // reference to the TrackingParticle

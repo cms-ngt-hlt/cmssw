@@ -48,9 +48,9 @@ process.load('Configuration.StandardSequences.EndOfProcess_cff')
 process.load("Validation.RecoTrack.associators_cff")
 ### load hltSiPixelRecHit Producer
 process.load("HLTrigger.Configuration.HLT_75e33.modules.hltSiPixelRecHits_cfi")
-### load the new EDProducer "SimDoubletsProducer"
+### load the new EDProducer "SimDoubletsProducerPhase2"
 process.load("SimTracker.TrackerHitAssociation.simDoubletsProducerPhase2_cfi")
-### load the new DQM EDAnalyzer "SimDoubletsAnalyzer"
+### load the new DQM EDAnalyzer "SimDoubletsAnalyzerPhase2"
 process.load("Validation.TrackingMCTruth.simDoubletsAnalyzerPhase2_cfi")
 
 ####  set up the paths

@@ -288,7 +288,7 @@ void SimDoubletsAnalyzer<TrackerTraits>::analyze(const edm::Event& iEvent, const
     auto true_eta = simDoublets.trackingParticle()->eta();
 
     // create the true RecHit doublets of the TrackingParticle
-    auto doublets = simDoublets.getSimDoublets(trackerGeometry_);
+    auto doublets = simDoublets.getSimDoublets(trackerGeometry_, trackerTopology_);
 
     int numSimDoublets = doublets.size();
     float weight = 1. / float(numSimDoublets);
