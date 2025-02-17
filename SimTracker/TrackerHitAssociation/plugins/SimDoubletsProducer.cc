@@ -146,9 +146,13 @@ SimDoubletsProducer<TrackerTraits>::SimDoubletsProducer(const edm::ParameterSet&
 }
 
 
-
+// dummy fillDescription
 template <typename TrackerTraits>
-void SimDoubletsProducer<TrackerTraits>::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+void SimDoubletsProducer<TrackerTraits>::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {}
+
+// Phase 1 fillDescription
+template <>
+void SimDoubletsProducer<pixelTopology::Phase1>::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
   
   // sources for cluster-TrackingParticle association, TrackingParticles and RecHits
@@ -160,15 +164,49 @@ void SimDoubletsProducer<TrackerTraits>::fillDescriptions(edm::ConfigurationDesc
   // FIXME : maybe move those settings to a separate file
   // parameter set for the selection of TrackingParticles that will be used for SimHitDoublets
   edm::ParameterSetDescription descTPSelector;
-  descTPSelector.add<double>("ptMin", 0.005);
+  descTPSelector.add<double>("ptMin", 0.9);
   descTPSelector.add<double>("ptMax", 1e100);
-  descTPSelector.add<double>("minRapidity", -5.);
-  descTPSelector.add<double>("maxRapidity", 5.);
-  descTPSelector.add<double>("tip", 100.); // FIXME : for now it's just a random large value
-  descTPSelector.add<double>("lip", 100.); // FIXME : for now it's just a random large value
+  descTPSelector.add<double>("minRapidity", -3.);
+  descTPSelector.add<double>("maxRapidity", 3.);
+  descTPSelector.add<double>("tip", 60.);
+  descTPSelector.add<double>("lip", 30.);
   descTPSelector.add<int>("minHit", 0);
   descTPSelector.add<bool>("signalOnly", true);
-  descTPSelector.add<bool>("intimeOnly", true);
+  descTPSelector.add<bool>("intimeOnly", false);
+  descTPSelector.add<bool>("chargedOnly", true);
+  descTPSelector.add<bool>("stableOnly", false);
+  descTPSelector.add<std::vector<int>>("pdgId", {});
+  descTPSelector.add<bool>("invertRapidityCut", false);
+  descTPSelector.add<double>("minPhi", -3.2);
+  descTPSelector.add<double>("maxPhi", 3.2);
+  desc.add<edm::ParameterSetDescription>("TrackingParticleSelectionConfig", descTPSelector);
+
+  descriptions.addWithDefaultLabel(desc);
+}
+
+// Phase 2 fillDescription
+template <>
+void SimDoubletsProducer<pixelTopology::Phase2>::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+  edm::ParameterSetDescription desc;
+  
+  // sources for cluster-TrackingParticle association, TrackingParticles and RecHits
+  desc.add<edm::InputTag>("clusterTPAssociationSrc", edm::InputTag("hltTPClusterProducer"));
+  desc.add<edm::InputTag>("trackingParticleSrc", edm::InputTag("mix", "MergedTrackTruth"));
+  desc.add<edm::InputTag>("pixelRecHitSrc", edm::InputTag("hltSiPixelRecHits"));
+  desc.add<edm::InputTag>("beamSpotSrc", edm::InputTag("hltOnlineBeamSpot"));
+
+  // FIXME : maybe move those settings to a separate file
+  // parameter set for the selection of TrackingParticles that will be used for SimHitDoublets
+  edm::ParameterSetDescription descTPSelector;
+  descTPSelector.add<double>("ptMin", 0.9);
+  descTPSelector.add<double>("ptMax", 1e100);
+  descTPSelector.add<double>("minRapidity", -4.5);
+  descTPSelector.add<double>("maxRapidity", 4.5);
+  descTPSelector.add<double>("tip", 2.); // NOTE: differs from HLT MultiTrackValidator
+  descTPSelector.add<double>("lip", 30.);
+  descTPSelector.add<int>("minHit", 0);
+  descTPSelector.add<bool>("signalOnly", true);
+  descTPSelector.add<bool>("intimeOnly", false);
   descTPSelector.add<bool>("chargedOnly", true);
   descTPSelector.add<bool>("stableOnly", false);
   descTPSelector.add<std::vector<int>>("pdgId", {});
@@ -250,6 +288,7 @@ void SimDoubletsProducer<TrackerTraits>::produce(edm::Event& event, const edm::E
     for (auto const& hit : detSet) {
       count_totRecHits++;
 
+      // find associated TrackingParticles
       auto range = clusterTPAssociation.equal_range(OmniClusterRef(hit.cluster()));
 
       // if the RecHit has associated TrackingParticles
