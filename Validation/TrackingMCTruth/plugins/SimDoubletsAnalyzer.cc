@@ -587,18 +587,18 @@ void SimDoubletsAnalyzer<TrackerTraits>::bookHistograms(DQMStore::IBooker& ibook
   // overview histograms
   h_layerPairs_ = ibook.book2D("layerPairs",
                                "Layer pairs in SimDoublets; Inner layer ID; Outer layer ID",
-                               28,
+                               TrackerTraits::numberOfLayers,
                                -0.5,
-                               27.5,
-                               28,
+                               -0.5 + TrackerTraits::numberOfLayers,
+                               TrackerTraits::numberOfLayers,
                                -0.5,
                                -0.5 + TrackerTraits::numberOfLayers);
   h_pass_layerPairs_ = ibook.book2D("pass_layerPairs",
                                     "Layer pairs in SimDoublets passing all cuts; Inner layer ID; Outer layer ID",
-                                    28,
+                                    TrackerTraits::numberOfLayers,
                                     -0.5,
-                                    27.5,
-                                    28,
+                                    -0.5 + TrackerTraits::numberOfLayers,
+                                    TrackerTraits::numberOfLayers,
                                     -0.5,
                                     -0.5 + TrackerTraits::numberOfLayers);
   h_numSkippedLayers_ = ibook.book1D(
