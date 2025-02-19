@@ -46,16 +46,16 @@ typedef edm::RefVector<SiPixelRecHitCollection, SiPixelRecHit> SiPixelRecHitRefV
 class SimDoublets {
 public:
   /**
-     * Sub-class for true doublets of RecHits
-     *  - first hit = inner RecHit
-     *  - second hit = outer RecHit
-     */
+    * Sub-class for true doublets of RecHits
+    *  - first hit = inner RecHit
+    *  - second hit = outer RecHit
+    */
   class Doublet {
   public:
     enum layer { inner = 0, outer = 1 };  // not used anywhere yet...
 
     // default constructor
-    Doublet() {}
+    Doublet() = default;
 
     // constructor with explicit setting of useClusterLocalPosition_
     Doublet(SimDoublets const&, size_t const, size_t const, const TrackerGeometry*, const TrackerTopology*, bool);
@@ -105,7 +105,7 @@ public:
   };
 
   // default contructor
-  SimDoublets() {}
+  SimDoublets() = default;
 
   // constructor
   SimDoublets(TrackingParticleRef const trackingParticleRef, reco::BeamSpot const& beamSpot)
@@ -152,7 +152,8 @@ public:
   void sortRecHits(const TrackerGeometry*);
 
   // method to produce the SimDoublets from the RecHits
-  std::vector<Doublet> getSimDoublets(const TrackerGeometry* trackerGeometry = nullptr, const TrackerTopology* trackerTopology = nullptr) const;
+  std::vector<Doublet> getSimDoublets(const TrackerGeometry* trackerGeometry = nullptr,
+                                      const TrackerTopology* trackerTopology = nullptr) const;
 
 private:
   TrackingParticleRef trackingParticleRef_;  // reference to the TrackingParticle

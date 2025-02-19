@@ -1,15 +1,19 @@
 #include "SimDataFormats/TrackingAnalysis/interface/SimDoublets.h"
 
+#include "SimDataFormats/TrackingAnalysis/interface/TrackingParticle.h"
 #include "DataFormats/GeometryVector/interface/GlobalVector.h"
 #include "DataFormats/GeometryCommonDetAlgo/interface/MeasurementPoint.h"
 #include "DataFormats/SiPixelDetId/interface/PixelSubdetector.h"
 
 namespace simdoublets {
 
-  // function that gets the global position of a RecHit based on its Cluster position
+  // Function that gets the global position of a RecHit with respect to a reference point.
+  // For this, the local position of the RecHit is used by default.
+  // By setting useClusterLocalPosition to true, one can change this behavior to use the local position 
+  // of the respective cluster instead (meant to be used if the RecHit position is invalid).
   GlobalPoint getGlobalHitPosition(SiPixelRecHitRef const& recHit,
                                    const TrackerGeometry* trackerGeometry,
-                                   GlobalVector const& beamSpotPosition,
+                                   GlobalVector const& referencePosition,
                                    bool const useClusterLocalPosition = false) {
     // get DetUnit of the RecHit
     DetId detIdObject(recHit->geographicalId());
@@ -29,7 +33,7 @@ namespace simdoublets {
       localPosition = recHit->localPositionFast();
     }
 
-    return (geomDetUnit->surface().toGlobal(localPosition) - beamSpotPosition);
+    return (geomDetUnit->surface().toGlobal(localPosition) - referencePosition);
   }
 
   // function that determines the number of skipped layers for a given pair of RecHits
@@ -90,6 +94,7 @@ namespace simdoublets {
 
 }  // end namespace simdoublets
 
+// ------------------------------------------
 // SimDoublets::Doublet class member function
 // ------------------------------------------
 
@@ -150,16 +155,21 @@ GlobalPoint SimDoublets::Doublet::outerGlobalPos() const {
       recHitRefs_.second, trackerGeometry_, beamSpotPosition_, useClusterLocalPosition_);
 }
 
+// ---------------------------------
 // SimDoublets class member function
 // ---------------------------------
 
 // method to sort the RecHits according to the position
 void SimDoublets::sortRecHits(const TrackerGeometry* trackerGeometry) {
+  // get the production vertex of the TrackingParticle
+  const GlobalVector vertex(trackingParticleRef_->vx(), trackingParticleRef_->vy(), trackingParticleRef_->vz());
+
   // get the vector of squared magnitudes of the global RecHit positions
   std::vector<double> recHitMag2;
   recHitMag2.reserve(layerIdVector_.size());
   for (const auto& recHit : recHitRefVector_) {
-    Global3DPoint globalPosition = simdoublets::getGlobalHitPosition(recHit, trackerGeometry, beamSpotPosition_, true);
+    // global RecHit position with respect to the production vertex
+    Global3DPoint globalPosition = simdoublets::getGlobalHitPosition(recHit, trackerGeometry, vertex, true);
     recHitMag2.push_back(globalPosition.mag2());
   }
 
