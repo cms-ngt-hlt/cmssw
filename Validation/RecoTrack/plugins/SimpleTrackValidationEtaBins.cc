@@ -148,8 +148,8 @@ void SimpleTrackValidationEtaBins::analyze(const edm::Event& iEvent, const edm::
       }
     }
 
-    LogPrint("TrackValidator") << "Tag " << trackLabels_[0].label() << " Total simulated " << st
-                               << " Associated tracks " << at << " Total reconstructed " << rt;
+    // LogPrint("TrackValidator") << "Tag " << trackLabels_[0].label() << " Total simulated " << st
+    //                            << " Associated tracks " << at << " Total reconstructed " << rt;
     global_rt_ += rt;
     global_st_ += st;
     global_at_ += at;
