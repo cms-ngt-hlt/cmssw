@@ -152,6 +152,9 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
                                       (float)cfg.getParameter<double>("cellPtCut"),
                                       cfg.getParameter<int>("minYsizeB1"),
                                       cfg.getParameter<int>("minYsizeB2"),
+                                      cfg.getParameter<int>("cellMaxDYSize12"),
+                                      cfg.getParameter<int>("cellMaxDYSize"),
+                                      cfg.getParameter<int>("cellMaxDYPred"),
                                       cfg.getParameter<std::vector<int>>("phiCuts")};
     }
 
@@ -225,6 +228,12 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
 
     desc.add<int>("minYsizeB1", 1)->setComment("Min Y cluster size in pixel B1");
     desc.add<int>("minYsizeB2", 1)->setComment("Min Y cluster size in pixel B2");
+    desc.add<int>("cellMaxDYSize12", 28)->setComment("Maximum cluster size difference for B1/B2");
+    desc.add<int>("cellMaxDYSize", 20)->setComment("Maximum cluster size difference");
+    desc.add<int>("cellMaxDYPred", 20)
+        ->setComment(
+            "Maximum cluster size difference between size of inner cluster and its prediction based on angle to "
+            "the outer hit");
 
     desc.add<std::vector<int>>(
             "phiCuts",
@@ -264,6 +273,12 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
 
     desc.add<int>("minYsizeB1", 36)->setComment("Min Y cluster size in pixel B1");
     desc.add<int>("minYsizeB2", 28)->setComment("Min Y cluster size in pixel B2");
+    desc.add<int>("cellMaxDYSize12", 28)->setComment("Maximum cluster size difference for B1/B2");
+    desc.add<int>("cellMaxDYSize", 20)->setComment("Maximum cluster size difference");
+    desc.add<int>("cellMaxDYPred", 20)
+        ->setComment(
+            "Maximum cluster size difference between size of inner cluster and its prediction based on angle to "
+            "the outer hit");
 
     desc.add<std::vector<int>>(
             "phiCuts",
@@ -294,6 +309,12 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE {
 
     desc.add<int>("minYsizeB1", 25)->setComment("Min Y cluster size in pixel B1");
     desc.add<int>("minYsizeB2", 15)->setComment("Min Y cluster size in pixel B2");
+    desc.add<int>("cellMaxDYSize12", 12)->setComment("Maximum cluster size difference for B1/B2");
+    desc.add<int>("cellMaxDYSize", 10)->setComment("Maximum cluster size difference");
+    desc.add<int>("cellMaxDYPred", 20)
+        ->setComment(
+            "Maximum cluster size difference between size of inner cluster and its prediction based on angle to "
+            "the outer hit");
 
     desc.add<std::vector<int>>(
             "phiCuts",
