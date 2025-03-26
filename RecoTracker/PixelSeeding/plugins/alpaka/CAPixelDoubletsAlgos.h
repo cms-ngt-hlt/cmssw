@@ -115,7 +115,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::caPixelDoublets {
 
       if (not innerBarrel and not onlyBarrel)
         return false;
-        auto dy = innerB1 ? maxDYSize12_ : maxDYSize_;
+      auto dy = innerB1 ? maxDYSize12_ : maxDYSize_;
 
       return onlyBarrel ? so > 0 && std::abs(so - mes) > dy
                         : innerBarrel && std::abs(mes - int(std::abs(dz / dr) * T::dzdrFact + 0.5f)) > maxDYPred_;
