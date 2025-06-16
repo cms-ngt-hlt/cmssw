@@ -11,6 +11,7 @@ from HLTrigger.NGTScouting.hltElectrons_cfi import *
 from HLTrigger.NGTScouting.hltMuons_cfi import *
 from HLTrigger.NGTScouting.hltTracks_cfi import *
 from HLTrigger.NGTScouting.hltJets_cfi import *
+from HLTrigger.NGTScouting.hltTracksters_cfi import *
 from HLTrigger.NGTScouting.hltTriggerAcceptFilter_cfi import hltTriggerAcceptFilter,dstTriggerAcceptFilter
 
 hltNanoProducer = cms.Sequence(
@@ -28,6 +29,9 @@ hltNanoProducer = cms.Sequence(
     + hltMuonTable
     + hltPFCandidateTable
     + hltJetTable
+    + hltTrackstersTable
+    + hltTrackstersAssociationOneToManyTable
+    + hltSimCl2CPOneToOneFlatTable
 )
 
 dstNanoProducer = cms.Sequence(
@@ -45,6 +49,9 @@ dstNanoProducer = cms.Sequence(
     + hltMuonTable
     + hltPFCandidateTable
     + hltJetTable
+    + hltTrackstersTable
+    + hltTrackstersAssociationOneToManyTable
+    + hltSimCl2CPOneToOneFlatTable
 )
 
 def hltNanoCustomize(process):
