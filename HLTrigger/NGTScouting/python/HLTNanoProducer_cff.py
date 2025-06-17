@@ -30,8 +30,6 @@ hltNanoProducer = cms.Sequence(
     + hltPFCandidateTable
     + hltJetTable
     + hltTrackstersTable
-    + hltTrackstersAssociationOneToManyTable
-    + hltSimCl2CPOneToOneFlatTable
 )
 
 dstNanoProducer = cms.Sequence(
@@ -50,8 +48,6 @@ dstNanoProducer = cms.Sequence(
     + hltPFCandidateTable
     + hltJetTable
     + hltTrackstersTable
-    + hltTrackstersAssociationOneToManyTable
-    + hltSimCl2CPOneToOneFlatTable
 )
 
 def hltNanoCustomize(process):
@@ -67,5 +63,11 @@ def hltNanoCustomize(process):
                 [p for p in process.paths if p.startswith('HLT_') or p.startswith('DST_')]
             )
         )
+
+    return process
+
+def hltNanoValCustomize(process):
+    if hasattr(process, "dstNanoProducer"):
+        process.dstNanoProducer += (process.hltTrackstersAssociationOneToManyTable + process.hltSimCl2CPOneToOneFlatTable)
 
     return process
