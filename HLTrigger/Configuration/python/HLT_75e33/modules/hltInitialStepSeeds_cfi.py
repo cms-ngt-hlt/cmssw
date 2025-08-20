@@ -19,6 +19,9 @@ hltInitialStepSeeds = cms.EDProducer("SeedGeneratorFromProtoTracksEDProducer",
 from Configuration.ProcessModifiers.trackingLST_cff import trackingLST
 trackingLST.toModify(hltInitialStepSeeds, includeFourthHit = True)
 
+from Configuration.ProcessModifiers.phase2CAExtension_cff import phase2CAExtension
+(phase2CAExtension & trackingLST).toModify(hltInitialStepSeeds, removeOTRechits = True)
+
 from Configuration.ProcessModifiers.ngtScouting_cff import ngtScouting
 ngtScouting.toModify(hltInitialStepSeeds, removeOTRechits = True)
 
