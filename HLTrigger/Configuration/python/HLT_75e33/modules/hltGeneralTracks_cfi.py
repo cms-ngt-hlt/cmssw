@@ -90,7 +90,7 @@ from Configuration.ProcessModifiers.ngtScouting_cff import ngtScouting
 
 from ..modules.hltPhase2PixelTracks_cfi import *
 from ..modules.hltPhase2PixelTracksSelectionHighPurity_cfi import *
-_hltGeneralTracksNGTScouting = hltGeneralTracks.clone(
+_hltGeneralTracksNGTScoutingLST = hltGeneralTracks.clone(
             TrackProducers = ["hltPhase2PixelTracksSelectionHighPurity", "hltInitialStepTracksT5TCLST"],
             hasSelector = [0,0],
             indivShareFrac = [0.1,0.1],
@@ -100,5 +100,7 @@ _hltGeneralTracksNGTScouting = hltGeneralTracks.clone(
                tLists = cms.vint32(0,1,)
             )]
     )
-ngtScouting.toReplaceWith(hltGeneralTracks, _hltGeneralTracksNGTScouting)
 
+(ngtScouting & ~trackingLST).toReplaceWith(hltGeneralTracks, hltPhase2PixelTracksSelectionHighPurity)
+
+(ngtScouting & trackingLST).toReplaceWith(hltGeneralTracks, _hltGeneralTracksNGTScoutingLST)

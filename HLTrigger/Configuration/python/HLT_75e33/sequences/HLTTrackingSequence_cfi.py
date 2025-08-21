@@ -27,7 +27,9 @@ from Configuration.ProcessModifiers.singleIterPatatrack_cff import singleIterPat
 singleIterPatatrack.toReplaceWith(HLTTrackingSequence, HLTTrackingSequence.copyAndExclude([HLTHighPtTripletStepSequence]))
 
 from Configuration.ProcessModifiers.ngtScouting_cff import ngtScouting
-ngtScouting.toReplaceWith(HLTTrackingSequence, HLTTrackingSequence.copyAndExclude([HLTHighPtTripletStepSequence]))
+from Configuration.ProcessModifiers.trackingLST_cff import trackingLST
+(ngtScouting & trackingLST).toReplaceWith(HLTTrackingSequence, HLTTrackingSequence.copyAndExclude([HLTHighPtTripletStepSequence]))
+(ngtScouting & ~trackingLST).toReplaceWith(HLTTrackingSequence, HLTTrackingSequence.copyAndExclude([HLTInitialStepSequence,HLTHighPtTripletStepSequence]))
 
 from Configuration.ProcessModifiers.phase2_hlt_vertexTrimming_cff import phase2_hlt_vertexTrimming
 _HLTTrackingSequenceTrimming = HLTTrackingSequence.copy()
