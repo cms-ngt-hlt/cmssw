@@ -14,9 +14,19 @@ from Validation.RecoTrack.associators_cff import hltTPClusterProducer, hltTrackA
 from SimTracker.VertexAssociation.VertexAssociatorByPositionAndTracks_cfi import VertexAssociatorByPositionAndTracks as _VertexAssociatorByPositionAndTracks
 vertexAssociatorByPositionAndTracks4pixelTracks = _VertexAssociatorByPositionAndTracks.clone(
     trackAssociation = "tpToHLTpixelTrackAssociation",
-    sharedTrackFraction = -1, # requires optimization
+    sharedTrackFraction = 0.5, # requires optimization
     weightMethod = "dzError",
 )
+
+tpToHLTpixelTrackCAExtensionAssociation = tpToHLTpixelTrackAssociation.clone(
+    label_tr = cms.InputTag("hltPhase2PixelTracksCAExtension"),
+)
+
+from Configuration.ProcessModifiers.phase2CAExtension_cff import phase2CAExtension
+phase2CAExtension.toModify(vertexAssociatorByPositionAndTracks4pixelTracks,
+                           trackAssociation = "tpToHLTpixelTrackCAExtensionAssociation"
+)
+
 hltOtherTPClusterProducer = hltTPClusterProducer.clone(
     stripClusterOtherSrc = "hltSiStripRawToClustersFacilityOnDemand"
 )
@@ -83,6 +93,10 @@ hltMultiPVAssociations = cms.Task(
     tpToHLTphase2TrackAssociation,
     vertexAssociatorByPositionAndTracks4phase2HLTTracks
 )
+
+_hltMultiPVAssociations = hltMultiPVAssociations.copy()
+_hltMultiPVAssociations.add(tpToHLTpixelTrackCAExtensionAssociation)
+phase2CAExtension.toReplaceWith(hltMultiPVAssociations, _hltMultiPVAssociations)
 
 hltMultiPVValidation = cms.Sequence( 
     hltPixelPVanalysis

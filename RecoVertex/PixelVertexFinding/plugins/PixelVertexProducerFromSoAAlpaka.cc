@@ -125,7 +125,8 @@ void PixelVertexProducerFromSoAAlpaka::produce(edm::StreamID streamID,
       assert(it < int(indToEdm.size()));
       auto k = indToEdm[it];
       if (k > tracksSize) {
-        edm::LogWarning("PixelVertexProducer") << "oops track " << it << " does not exists on CPU " << k;
+        if (k != static_cast<uint32_t>(-1))  // FIXME use a sensible value instead of -1 for skipped tracks
+          edm::LogWarning("PixelVertexProducer") << "oops track " << it << " does not exists on CPU " << k;
         continue;
       }
       auto tk = reco::TrackRef(tracksHandle, k);
