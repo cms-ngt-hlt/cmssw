@@ -82,6 +82,14 @@ def _modifyFullPVanalysisForPhase2(pvanalysis):
 
 phase2_tracker.toModify(hltPVanalysis, _modifyFullPVanalysisForPhase2)
 
+from Configuration.ProcessModifiers.ngtScouting_cff import ngtScouting
+(phase2CAExtension & ngtScouting).toModify(vertexAssociatorByPositionAndTracks4phase2HLTTracks,
+                                           trackAssociation = "tpToHLTpixelTrackCAExtensionAssociation"
+)
+(phase2CAExtension & ngtScouting).toModify(hltPVanalysis,
+                                           trackAssociatorMap = "tpToHLTpixelTrackCAExtensionAssociation"
+)
+
 hltMultiPVAssociations = cms.Task(
     hltOtherTPClusterProducer,
     hltTrackAssociatorByHits,
