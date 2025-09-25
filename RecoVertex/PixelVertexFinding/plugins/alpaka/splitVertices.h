@@ -32,6 +32,9 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::vertexFinder {
 
     // one vertex per block
     for (auto kv : cms::alpakatools::independent_groups(acc, data.nvFinal())) {
+      if constexpr (verbose) {
+        printf("Analysing vertex %d with chi2 %f and ndof %d and maxChi2 %f is good candidated for splitting: %d\n", kv, data[kv].chi2(), trkdata[kv].ndof(), maxChi2, (data[kv].chi2() >= maxChi2 * float(trkdata[kv].ndof())));
+      }
       int32_t ndof = trkdata[kv].ndof();
       if (ndof < 4)
         continue;
@@ -71,6 +74,9 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::vertexFinder {
       // kt-min....
       bool more = true;
       while (alpaka::syncBlockThreadsPredicate<alpaka::BlockOr>(acc, more)) {
+        if constexpr (verbose) {
+          printf("Starting iteration %d of %d with %d tracks \n", 20 - maxiter, maxiter, nq);
+        }
         more = false;
         if (cms::alpakatools::once_per_block(acc)) {
           znew[0] = 0;
@@ -79,26 +85,37 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::vertexFinder {
           wnew[1] = 0;
         }
         alpaka::syncBlockThreads(acc);
+        if constexpr (verbose) {
+          printf("Prepared two-vertices splitting data structures\n");
+        }
 
-        for (auto k : cms::alpakatools::uniform_elements(acc, nq)) {
+        for (auto k : cms::alpakatools::independent_group_elements(acc, nq)) {
+          ALPAKA_ASSERT_ACC(newV[k] == 0 || newV[k] == 1);
           auto i = newV[k];
+          if constexpr (verbose) {
+            printf("Track %d of %d assigned to split vertex %d\n", k, nq, i);
+          }
           alpaka::atomicAdd(acc, &znew[i], zz[k] * ww[k], alpaka::hierarchy::Threads{});
           alpaka::atomicAdd(acc, &wnew[i], ww[k], alpaka::hierarchy::Threads{});
         }
         alpaka::syncBlockThreads(acc);
 
         if (cms::alpakatools::once_per_block(acc)) {
+          ALPAKA_ASSERT_ACC(wnew[0] != 0 && wnew[1] != 0);
           znew[0] /= wnew[0];
           znew[1] /= wnew[1];
         }
         alpaka::syncBlockThreads(acc);
 
-        for (auto k : cms::alpakatools::uniform_elements(acc, nq)) {
+        for (auto k : cms::alpakatools::independent_group_elements(acc, nq)) {
           auto d0 = fabs(zz[k] - znew[0]);
           auto d1 = fabs(zz[k] - znew[1]);
           auto newer = d0 < d1 ? 0 : 1;
           more |= newer != newV[k];
           newV[k] = newer;
+          if constexpr (verbose) {
+            printf("Track %d swapped vertex %d\n", k, more);
+          }
         }
         --maxiter;
         if (maxiter <= 0)
@@ -115,8 +132,7 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::vertexFinder {
       auto chi2Dist = dist2 / (1.f / wnew[0] + 1.f / wnew[1]);
 
       if constexpr (verbose) {
-        if (cms::alpakatools::once_per_block(acc))
-          printf("inter %d %f %f\n", 20 - maxiter, chi2Dist, dist2 * data[kv].wv());
+        printf("iteration %d of %d, chi2Distance: %f %f\n", 20 - maxiter, maxiter, chi2Dist, dist2 * data[kv].wv());
       }
 
       if (chi2Dist < 4)
@@ -127,7 +143,11 @@ namespace ALPAKA_ACCELERATOR_NAMESPACE::vertexFinder {
       if (cms::alpakatools::once_per_block(acc))
         igv = alpaka::atomicAdd(acc, &ws.nvIntermediate(), 1u, alpaka::hierarchy::Blocks{});
       alpaka::syncBlockThreads(acc);
-      for (auto k : cms::alpakatools::uniform_elements(acc, nq)) {
+      if constexpr (verbose) {
+        if (cms::alpakatools::once_per_block(acc))
+          printf("Splitting vertex %d to %d\n", kv, igv);
+      }
+      for (auto k : cms::alpakatools::independent_group_elements(acc, nq)) {
         if (1 == newV[k])
           ws[it[k]].iv() = igv;
       }
