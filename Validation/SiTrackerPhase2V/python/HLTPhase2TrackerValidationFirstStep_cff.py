@@ -47,7 +47,7 @@ from Configuration.ProcessModifiers.seedingLST_cff import seedingLST
 
 # Conditionally add hltRechitValidOT if either trackingLST or seedingLST or phase2CAExtension is active
 from Configuration.ProcessModifiers.phase2CAExtension_cff import phase2CAExtension
-(trackingLST | seedingLST | phase2CAExtension).toModify(
+(trackingLST | seedingLST).toModify(
     hltTrackerphase2ValidationSource,
     lambda s: s.__iadd__(hltRechitValidOT)
 )
