@@ -77,6 +77,9 @@ autoNANO = {
     # HLT Nano
     'Phase2HLT' : {'sequence': 'HLTrigger/NGTScouting/HLTNanoProducer_cff.hltNanoProducer',
              'customize': 'HLTrigger/NGTScouting/HLTNanoProducer_cff.hltNanoCustomize'},
+    # HLT Nano PixelOnly with TP association
+    'Phase2HLTPixelOnly' : {'sequence': 'HLTrigger/NGTScouting/HLTNanoProducer_cff.hltNanoProducerPixelOnly',
+                            'customize': 'HLTrigger/NGTScouting/HLTNanoProducer_cff.hltNanoCustomize'},
 
     # NGT scouting Nano
     'NGTScouting' : {'sequence': 'HLTrigger/NGTScouting/HLTNanoProducer_cff.dstNanoProducer',

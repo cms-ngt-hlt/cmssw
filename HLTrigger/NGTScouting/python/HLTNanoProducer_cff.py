@@ -67,10 +67,20 @@ hltNanoProducer = cms.Sequence(
     + HTTable
 )
 
+hltNanoProducerPixelOnly = cms.Sequence(
+    NanoGenTable
+    + pixelTrackAssoc
+    + hltPixelTrackTable
+    + hltPixelTrackExtTable
+    + hltPixelTrackRecHitsTable
+)
+
+
 dstNanoProducer = cms.Sequence(
     NanoGenTable
     + dstTriggerAcceptFilter
     + hltVertexTable
+    + pixelTrackAssoc
     + hltPixelTrackTable
     + hltPixelVertexTable
     + hltGeneralTrackTable
@@ -93,6 +103,7 @@ dstNanoProducer = cms.Sequence(
 
 trackingExtraNanoProducer = cms.Sequence(
     hltPixelTrackExtTable+
+    hltPixelTrackRecHitsTable+
     hltGeneralTrackExtTable
 )
 
