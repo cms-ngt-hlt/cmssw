@@ -1,10 +1,11 @@
 <use name="ofast-flag"/>
+<use name="CondFormats/GBRForest"/>
 <use name="DataFormats/TrackReco"/>
 <use name="DataFormats/VertexReco"/>
 <use name="FWCore/Framework"/>
 <use name="FWCore/MessageLogger"/>
 <use name="FWCore/ParameterSet"/>
-<use name="CondFormats/GBRForest"/>
+<use name="PhysicsTools/ONNXRuntime"/>
 <use name="TrackingTools/PatternTools"/>
 <use name="roottmva"/>
 <use name="lwtnn"/>
