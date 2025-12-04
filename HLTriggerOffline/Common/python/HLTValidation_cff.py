@@ -36,6 +36,7 @@ hgcalHitCalibrationHLT = _hgcalHitCalibrationDefault.clone(
 # HGCAL validation
 from Validation.HGCalValidation.HLTHGCalValidator_cff import *
 from RecoHGCal.TICL.HLTSimTracksters_cff import *
+from Validation.RecoTau.ticlTauValidation_cfi import *
 
 # offline dqm:
 # from DQMOffline.Trigger.DQMOffline_Trigger_cff.py import *
@@ -118,6 +119,7 @@ _hltvalidationWithMC_Phase2 = hltvalidationWithMC.copyAndExclude([#HLTMuonVal,
 _hltvalidationWithMC_Phase2.insert(-1, hgcalHitCalibrationHLT)
 _hltvalidationWithMC_Phase2.insert(-1, hltHgcalValidator)
 _hltvalidationWithMC_Phase2.insert(-1, hltGENValidation)
+#_hltvalidationWithMC_Phase2.insert(-1, hltTiclTauValidation)
 phase2_common.toReplaceWith(hltvalidationWithMC, _hltvalidationWithMC_Phase2)
 
 hltvalidationWithData = cms.Sequence(
