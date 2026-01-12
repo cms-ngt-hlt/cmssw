@@ -119,7 +119,7 @@ _hltvalidationWithMC_Phase2 = hltvalidationWithMC.copyAndExclude([#HLTMuonVal,
 _hltvalidationWithMC_Phase2.insert(-1, hgcalHitCalibrationHLT)
 _hltvalidationWithMC_Phase2.insert(-1, hltHgcalValidator)
 _hltvalidationWithMC_Phase2.insert(-1, hltGENValidation)
-#_hltvalidationWithMC_Phase2.insert(-1, hltTiclTauValidation)
+#_hltvalidationWithMC_Phase2.insert(-1, hltTiclTauValidator)
 phase2_common.toReplaceWith(hltvalidationWithMC, _hltvalidationWithMC_Phase2)
 
 hltvalidationWithData = cms.Sequence(
