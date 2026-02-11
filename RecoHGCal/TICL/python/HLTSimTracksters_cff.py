@@ -32,6 +32,18 @@ hltTiclSimTracksters = _simTrackstersProducer.clone(
     computeLocalTime = cms.bool(False)
 )
 
+from PhysicsTools.JetMCAlgos.TauGenJets_cfi import tauGenJets
+from PhysicsTools.JetMCAlgos.TauGenJetsDecayModeSelectorAllHadrons_cfi import tauGenJetsSelectorAllHadrons
+
+genVisTaus = cms.EDProducer("GenVisTauProducer",
+    src = cms.InputTag("tauGenJetsSelectorAllHadrons"),
+    srcGenParticles = cms.InputTag("genParticles")
+)
+
+hltGenVisTauTask = cms.Task(tauGenJets,
+                            tauGenJetsSelectorAllHadrons,
+                            genVisTaus)
+
 from Validation.Configuration.hltHGCalSimValid_cff import *
 
 hltTiclSimTrackstersTask = cms.Task(hltTrackAssociatorByHits,
@@ -39,7 +51,9 @@ hltTiclSimTrackstersTask = cms.Task(hltTrackAssociatorByHits,
                                     simHitTPAssocProducer,
                                     hltHgcalAssociatorsTask,
                                     hltFilteredLayerClustersSimTracksters,
-                                    hltTiclSimTracksters)
+                                    hltTiclSimTracksters,
+                                    hltGenVisTauTask
+                                    )
 
 hltTiclSimTrackstersSeq = cms.Sequence(
     hltTiclSimTrackstersTask
