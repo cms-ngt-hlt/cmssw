@@ -102,7 +102,7 @@ hltvalidationWithMC = cms.Sequence(
 # Exclude everything except Muon and JetMET for now. Add HGCAL Hit Calibration
 from Configuration.Eras.Modifier_phase2_common_cff import phase2_common
 _hltvalidationWithMC_Phase2 = hltvalidationWithMC.copyAndExclude([#HLTMuonVal,
-  HLTTauVal,
+  #HLTTauVal,
   egammaValidationSequence,
   heavyFlavorValidationSequence,
   #HLTJetMETValSeq,
@@ -117,7 +117,7 @@ _hltvalidationWithMC_Phase2 = hltvalidationWithMC.copyAndExclude([#HLTMuonVal,
   hltHCALNoiseRates])
 _hltvalidationWithMC_Phase2.insert(-1, hgcalHitCalibrationHLT)
 _hltvalidationWithMC_Phase2.insert(-1, hltHgcalValidator)
-_hltvalidationWithMC_Phase2.insert(-1, hltGENValidation)
+_hltvalidationWithMC_Phase2.insert(0, hltGENValidation)
 phase2_common.toReplaceWith(hltvalidationWithMC, _hltvalidationWithMC_Phase2)
 
 hltvalidationWithData = cms.Sequence(
