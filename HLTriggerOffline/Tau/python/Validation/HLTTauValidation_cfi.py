@@ -101,3 +101,16 @@ hltTauValTagAndProbe = hltTauValIdealMonitorMC.clone(
 #hltTauValIdeal = cms.Sequence(hltTauValIdealMonitorMC+hltTauValIdealMonitorPF)
 hltTauValIdeal = cms.Sequence(hltTauValIdealMonitorMC+hltTauValIdealMonitorPF+hltTauValIdealMonitorPNet+hltTauValTagAndProbe)
 
+# Tau global validation 
+hltTauAnalyzer = DQMEDAnalyzer("TauValidationMiniAOD",
+  TauType = cms.string('reco'), # 'mini' for pat::TauCollection, 'reco' for reco::PFTauCollection
+  TauCollection = cms.InputTag("hltHpsPFTauProducer"),
+  RefCollection = cms.InputTag("kinematicSelectedTauValDenominatorQCD"),
+  ExtensionName = cms.string(""),
+  PVCollection  = cms.InputTag("offlineSlimmedPrimaryVertices"),
+  GenCollection = cms.InputTag("prunedGenParticles"),
+  discriminators = cms.VPSet(
+    cms.PSet(discriminator = cms.string("decayModeFinding"),selectionCut = cms.double(0.5)),
+  ),
+  isHLT = cms.bool(True),
+)

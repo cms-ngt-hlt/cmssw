@@ -19,6 +19,9 @@
 //       Date:       April 6th, 2020
 // Updated By:       Gourab Saha
 //       Date:       July 4th, 2023
+// Updated By:       Elena Vernazza
+//       Date:       April 9th, 2026
+
 #include "Validation/RecoTau/interface/TauValidationMiniAOD.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 
@@ -27,45 +30,46 @@ using namespace std;
 using namespace reco;
 
 TauValidationMiniAOD::TauValidationMiniAOD(const edm::ParameterSet &iConfig) {
+  // Flag for the definition of the tau type (mini or reco):
+  TauType = iConfig.getParameter<string>("TauType");
+  isMini = (std::string("mini") == TauType);  // <pat::TauCollection>
+  isReco = (std::string("reco") == TauType);  // <reco::PFTauCollection>
   // Input collection of legitimate taus:
-  tauCollection_ = consumes<pat::TauCollection>(iConfig.getParameter<InputTag>("tauCollection"));
+  if (isMini) {
+    patTauToken_ = consumes<pat::TauCollection>(iConfig.getParameter<InputTag>("TauCollection"));
+  } else if (isReco) {
+    pfTauToken_ = consumes<reco::PFTauCollection>(iConfig.getParameter<InputTag>("TauCollection"));
+  } else {
+    throw cms::Exception("Configuration") << "Unknown tau type: " << TauType << "\nPlease use 'mini', or 'reco'.";
+  }
   // Input collection to compare to taus:
-  refCollectionInputTagToken_ = consumes<edm::View<reco::Candidate>>(iConfig.getParameter<InputTag>("RefCollection"));
+  genRefToken_ = consumes<edm::View<reco::Candidate>>(iConfig.getParameter<InputTag>("RefCollection"));
+  // Input collection of gen particles:
+  prunedGenToken_ = consumes<std::vector<reco::GenParticle>>(iConfig.getParameter<InputTag>("GenCollection"));
+  // Input collection of primary vertices:
+  pvToken_ = consumes<std::vector<reco::Vertex>>(iConfig.getParameter<InputTag>("PVCollection"));
   // Information about reference collection:
   extensionName_ = iConfig.getParameter<string>("ExtensionName");
   // List of discriminators and their cuts:
   discriminators_ = iConfig.getParameter<std::vector<edm::ParameterSet>>("discriminators");
-  // Input primaryVertex collection:
-  primaryVertexCollectionToken_ = consumes<std::vector<reco::Vertex>>(iConfig.getParameter<InputTag>("PVCollection"));
-  // Input genetated particle collection:
-  prunedGenToken_ = consumes<std::vector<reco::GenParticle>>(iConfig.getParameter<InputTag>("GenCollection"));
+  isHLT = iConfig.getParameter<bool>("isHLT");
 }
 
 TauValidationMiniAOD::~TauValidationMiniAOD() {}
 
-void TauValidationMiniAOD::bookHistograms(DQMStore::IBooker &ibooker,
-                                          edm::Run const &iRun,
-                                          edm::EventSetup const & /* iSetup */) {
-  MonitorElement *ptTightvsJet, *etaTightvsJet, *phiTightvsJet, *massTightvsJet, *puTightvsJet;
-  MonitorElement *ptTightvsEle, *etaTightvsEle, *phiTightvsEle, *massTightvsEle, *puTightvsEle;
-  MonitorElement *ptTightvsMuo, *etaTightvsMuo, *phiTightvsMuo, *massTightvsMuo, *puTightvsMuo;
-  MonitorElement *ptMediumvsJet, *etaMediumvsJet, *phiMediumvsJet, *massMediumvsJet, *puMediumvsJet;
-  MonitorElement *ptMediumvsEle, *etaMediumvsEle, *phiMediumvsEle, *massMediumvsEle, *puMediumvsEle;
-  MonitorElement *ptMediumvsMuo, *etaMediumvsMuo, *phiMediumvsMuo, *massMediumvsMuo, *puMediumvsMuo;
-  MonitorElement *ptLoosevsJet, *etaLoosevsJet, *phiLoosevsJet, *massLoosevsJet, *puLoosevsJet;
-  MonitorElement *ptLoosevsEle, *etaLoosevsEle, *phiLoosevsEle, *massLoosevsEle, *puLoosevsEle;
-  MonitorElement *ptLoosevsMuo, *etaLoosevsMuo, *phiLoosevsMuo, *massLoosevsMuo, *puLoosevsMuo;
-  MonitorElement *ptTemp, *etaTemp, *phiTemp, *massTemp, *puTemp;
-  MonitorElement *decayModeFindingTemp, *decayModeTemp, *byDeepTau2018v2p5VSerawTemp;
-  MonitorElement *byDeepTau2018v2p5VSjetrawTemp, *byDeepTau2018v2p5VSmurawTemp, *summaryTemp;
-  MonitorElement *mtau_dm0, *mtau_dm1p2, *mtau_dm5, *mtau_dm6, *mtau_dm10, *mtau_dm11;
-  MonitorElement *dmMigration, *ntau_vs_dm;
-  MonitorElement *pTOverProng_dm0, *pTOverProng_dm1p2, *pTOverProng_dm5, *pTOverProng_dm6, *pTOverProng_dm10,
-      *pTOverProng_dm11;
+void TauValidationMiniAOD::bookHistograms(DQMStore::IBooker &ibooker, edm::Run const &iRun, edm::EventSetup const &iSetup) {
+  MonitorElement *summaryTemp;
+ 
+  std::string main_folder;
+  if (isHLT) {
+    main_folder = "HLT/Tau/TauValidation";
+  } else {
+    main_folder = "RecoTauV/miniAODValidation/" + extensionName_;
+  }
 
-  // ---------------------------- Book, Map Summary Histograms -------------------------------
+  // ---------------------------- Book Summary Histograms -------------------------------
 
-  ibooker.setCurrentFolder("RecoTauV/miniAODValidation/" + extensionName_ + "/Summary");
+  ibooker.setCurrentFolder(main_folder + "/Summary");
   histoInfo summaryHinfo = (histoSettings_.exists("summary"))
                                ? histoInfo(histoSettings_.getParameter<edm::ParameterSet>("summary"))
                                : histoInfo(15, -0.5, 14.5);
@@ -85,642 +89,409 @@ void TauValidationMiniAOD::bookHistograms(DQMStore::IBooker &ibooker,
   summaryTemp->setYTitle("Efficiency of discriminants");
   summaryMap.insert(std::make_pair("", summaryTemp));
 
-  histoInfo mtauHinfo = histoInfo(20, 0.0, 2.0);
-
-  mtau_dm0 = ibooker.book1D("mtau_dm0", "mtau: DM = 0", mtauHinfo.nbins, mtauHinfo.min, mtauHinfo.max);
-  mtau_dm0Map.insert(std::make_pair("", mtau_dm0));
-
-  mtau_dm1p2 = ibooker.book1D("mtau_dm1p2", "mtau: DM = 1+2", mtauHinfo.nbins, mtauHinfo.min, mtauHinfo.max);
-  mtau_dm1p2Map.insert(std::make_pair("", mtau_dm1p2));
-
-  mtau_dm5 = ibooker.book1D("mtau_dm5", "mtau: DM = 5", mtauHinfo.nbins, mtauHinfo.min, mtauHinfo.max);
-  mtau_dm5Map.insert(std::make_pair("", mtau_dm5));
-
-  mtau_dm6 = ibooker.book1D("mtau_dm6", "mtau: DM = 6", mtauHinfo.nbins, mtauHinfo.min, mtauHinfo.max);
-  mtau_dm6Map.insert(std::make_pair("", mtau_dm6));
-
-  mtau_dm10 = ibooker.book1D("mtau_dm10", "mtau: DM = 10", mtauHinfo.nbins, mtauHinfo.min, mtauHinfo.max);
-  mtau_dm10Map.insert(std::make_pair("", mtau_dm10));
-
-  mtau_dm11 = ibooker.book1D("mtau_dm11", "mtau: DM = 11", mtauHinfo.nbins, mtauHinfo.min, mtauHinfo.max);
-  mtau_dm11Map.insert(std::make_pair("", mtau_dm11));
-
-  dmMigration = ibooker.book2D("dmMigration", "DM Migration", 15, -0.5, 14.5, 15, -0.5, 14.5);
-  dmMigration->setXTitle("Generated tau DM");
-  dmMigration->setYTitle("Reconstructed tau DM");
-  dmMigrationMap.insert(std::make_pair("", dmMigration));
-
-  histoInfo pTOverProngHinfo = (histoSettings_.exists("pTOverProng"))
-                                   ? histoInfo(histoSettings_.getParameter<edm::ParameterSet>("pTOverProng"))
-                                   : histoInfo(50, 0, 1000);
-
-  pTOverProng_dm0 = ibooker.book2D("pTOverProng_dm0",
-                                   "pTOverProng: DM = 0",
-                                   pTOverProngHinfo.nbins,
-                                   pTOverProngHinfo.min,
-                                   pTOverProngHinfo.max,
-                                   pTOverProngHinfo.nbins,
-                                   pTOverProngHinfo.min,
-                                   pTOverProngHinfo.max);
-  pTOverProng_dm0->setXTitle("pT of reconstructed tau");
-  pTOverProng_dm0->setYTitle("pT of lead charged cand");
-  pTOverProng_dm0Map.insert(std::make_pair("", pTOverProng_dm0));
-
-  pTOverProng_dm1p2 = ibooker.book2D("pTOverProng_dm1p2",
-                                     "pTOverProng: DM = 1+2",
-                                     pTOverProngHinfo.nbins,
-                                     pTOverProngHinfo.min,
-                                     pTOverProngHinfo.max,
-                                     pTOverProngHinfo.nbins,
-                                     pTOverProngHinfo.min,
-                                     pTOverProngHinfo.max);
-  pTOverProng_dm1p2->setXTitle("pT of reconstructed tau");
-  pTOverProng_dm1p2->setYTitle("pT of lead charged cand");
-  pTOverProng_dm1p2Map.insert(std::make_pair("", pTOverProng_dm1p2));
-
-  pTOverProng_dm5 = ibooker.book2D("pTOverProng_dm5",
-                                   "pTOverProng: DM = 5",
-                                   pTOverProngHinfo.nbins,
-                                   pTOverProngHinfo.min,
-                                   pTOverProngHinfo.max,
-                                   pTOverProngHinfo.nbins,
-                                   pTOverProngHinfo.min,
-                                   pTOverProngHinfo.max);
-  pTOverProng_dm5->setXTitle("pT of reconstructed tau");
-  pTOverProng_dm5->setYTitle("pT of lead charged cand");
-  pTOverProng_dm5Map.insert(std::make_pair("", pTOverProng_dm5));
-
-  pTOverProng_dm6 = ibooker.book2D("pTOverProng_dm6",
-                                   "pTOverProng: DM = 6",
-                                   pTOverProngHinfo.nbins,
-                                   pTOverProngHinfo.min,
-                                   pTOverProngHinfo.max,
-                                   pTOverProngHinfo.nbins,
-                                   pTOverProngHinfo.min,
-                                   pTOverProngHinfo.max);
-  pTOverProng_dm6->setXTitle("pT of reconstructed tau");
-  pTOverProng_dm6->setYTitle("pT of lead charged cand");
-  pTOverProng_dm6Map.insert(std::make_pair("", pTOverProng_dm6));
-
-  pTOverProng_dm10 = ibooker.book2D("pTOverProng_dm10",
-                                    "pTOverProng: DM = 10",
-                                    pTOverProngHinfo.nbins,
-                                    pTOverProngHinfo.min,
-                                    pTOverProngHinfo.max,
-                                    pTOverProngHinfo.nbins,
-                                    pTOverProngHinfo.min,
-                                    pTOverProngHinfo.max);
-  pTOverProng_dm10->setXTitle("pT of reconstructed tau");
-  pTOverProng_dm10->setYTitle("pT of lead charged cand");
-  pTOverProng_dm10Map.insert(std::make_pair("", pTOverProng_dm10));
-
-  pTOverProng_dm11 = ibooker.book2D("pTOverProng_dm11",
-                                    "pTOverProng: DM = 11",
-                                    pTOverProngHinfo.nbins,
-                                    pTOverProngHinfo.min,
-                                    pTOverProngHinfo.max,
-                                    pTOverProngHinfo.nbins,
-                                    pTOverProngHinfo.min,
-                                    pTOverProngHinfo.max);
-  pTOverProng_dm11->setXTitle("pT of reconstructed tau");
-  pTOverProng_dm11->setYTitle("pT of lead charged cand");
-  pTOverProng_dm11Map.insert(std::make_pair("", pTOverProng_dm11));
-
-  ntau_vs_dm = ibooker.book2D("ntau_vs_dm", "DM vs nTau", 15, 0, 15, 15, 0, 15);
-  ntau_vs_dm->setXTitle("nTau");
-  ntau_vs_dm->setYTitle("tau DM");
-  ntau_vs_dmMap.insert(std::make_pair("", ntau_vs_dm));
-
   // add discriminator labels to summary plots
-  unsigned j = 0;
-  for (const auto &it : discriminators_) {
-    string DiscriminatorLabel = it.getParameter<string>("discriminator");
+  for (uint j = 0; j < discriminators_.size(); j++) {
+    string DiscriminatorLabel = discriminators_[j].getParameter<string>("discriminator");
     summaryMap.find("Den")->second->setBinLabel(j + 1, DiscriminatorLabel);
     summaryMap.find("Num")->second->setBinLabel(j + 1, DiscriminatorLabel);
     summaryMap.find("")->second->setBinLabel(j + 1, DiscriminatorLabel);
-    j = j + 1;
   }
 
-  // --------------- Book, Map Discriminator/Kinematic Histograms -----------------------
+  // book histograms for taus matched to reference gen particle
+  for (auto& hVar : histoVars) {
+    auto [nBins, hMin, hMax] = hVar.second;
+    h_tausMatchedToRef_[hVar.first] = ibooker.book1D("tau_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+  }
 
-  // pt, eta, phi, mass, pileup
-  histoInfo ptHinfo = (histoSettings_.exists("pt")) ? histoInfo(histoSettings_.getParameter<edm::ParameterSet>("pt"))
-                                                    : histoInfo(200, 0., 1000.);
-  histoInfo etaHinfo = (histoSettings_.exists("eta")) ? histoInfo(histoSettings_.getParameter<edm::ParameterSet>("eta"))
-                                                      : histoInfo(60, -3, 3.);
-  histoInfo phiHinfo = (histoSettings_.exists("phi")) ? histoInfo(histoSettings_.getParameter<edm::ParameterSet>("phi"))
-                                                      : histoInfo(60, -3, 3.);
-  histoInfo massHinfo = (histoSettings_.exists("mass"))
-                            ? histoInfo(histoSettings_.getParameter<edm::ParameterSet>("mass"))
-                            : histoInfo(200, 0, 10.);
-  histoInfo puHinfo = (histoSettings_.exists("pileup"))
-                          ? histoInfo(histoSettings_.getParameter<edm::ParameterSet>("pileup"))
-                          : histoInfo(100, 0., 100.);
+  // book deepTau and decay mode histograms
+  DeepTau2018v2p5VSele = ibooker.book1D("tau_byDeepTau2018v2p5VSeraw", ";DeepTau vs Ele", 200, 0., 1.);
+  DeepTau2018v2p5VSjet = ibooker.book1D("tau_byDeepTau2018v2p5VSjetraw", ";DeepTau vs Jet", 200, 0., 1.);
+  DeepTau2018v2p5VSmuo = ibooker.book1D("tau_byDeepTau2018v2p5VSmuraw", ";DeepTau vs Muo", 200, 0., 1.);
+  decayModeFinding = ibooker.book1D("tau_decayModeFinding", ";Decay Mode Finding", 2, -0.5, 1.5);
+  decayModeTauReco = ibooker.book1D("tau_decayMode_reco", "Reco #tau;Decay Mode", 15, -0.5, 14.5);
+  decayModeTauGen = ibooker.book1D("tau_decayMode_gen", "Gen #tau;Decay Mode", 15, -0.5, 14.5);
 
-  // decayMode, decayModeFinding
-  histoInfo decayModeFindingHinfo = (histoSettings_.exists("decayModeFinding"))
-                                        ? histoInfo(histoSettings_.getParameter<edm::ParameterSet>("decayModeFinding"))
-                                        : histoInfo(2, -0.5, 1.5);
-  histoInfo decayModeHinfo = (histoSettings_.exists("decayMode"))
-                                 ? histoInfo(histoSettings_.getParameter<edm::ParameterSet>("decayMode"))
-                                 : histoInfo(15, -0.5, 14.5);
+  dmMigration = ibooker.book2D("dmMigration", ";Gen #tau DM;Reco #tau DM", 15, -0.5, 14.5, 15, -0.5, 14.5);
+  nTau_vs_dm = ibooker.book2D("ntau_vs_dm", ";nTau;#tau DM", 15, 0, 15, 15, 0, 15);
 
-  // raw distributions for deepTau (e, jet, mu)
-  histoInfo byDeepTau2018v2p5VSerawHinfo =
-      (histoSettings_.exists("byDeepTau2018v2p5VSeraw"))
-          ? histoInfo(histoSettings_.getParameter<edm::ParameterSet>("byDeepTau2018v2p5VSeraw"))
-          : histoInfo(200, 0., 1.);
-  histoInfo byDeepTau2018v2p5VSjetrawHinfo =
-      (histoSettings_.exists("byDeepTau2018v2p5VSjetraw"))
-          ? histoInfo(histoSettings_.getParameter<edm::ParameterSet>("byDeepTau2018v2p5VSjetraw"))
-          : histoInfo(200, 0., 1.);
-  histoInfo byDeepTau2018v2p5VSmurawHinfo =
-      (histoSettings_.exists("byDeepTau2018v2p5VSmuraw"))
-          ? histoInfo(histoSettings_.getParameter<edm::ParameterSet>("byDeepTau2018v2p5VSmuraw"))
-          : histoInfo(200, 0., 1.);
+  // book histograms for tau pt and prong pt for different decay modes
+  h_pTOverProng_dm_.resize(dm_list.size());
+  h_TauMass_dm_.resize(dm_list.size());
+  std::string pT_Prong = "p_{T}^{#tau};p_{T} lead ch had";
+  for (uint i = 0; i < dm_list.size(); i++) {
+    const auto& [dm, label] = dm_list[i];;
+    h_pTOverProng_dm_[i] = ibooker.book2D("pTOverProng_" + label, "DM = " + label + ";" + pT_Prong, 50, 0, 1000, 50, 0, 1000);
+    h_TauMass_dm_[i] = ibooker.book1D("mtau_" + label, "DM = " + label + ";m_{#tau}", 20, 0.0, 2.0);
+  }
 
-  // book the temp histograms
-  ptTemp = ibooker.book1D("tau_pt", "tau pt", ptHinfo.nbins, ptHinfo.min, ptHinfo.max);
-  etaTemp = ibooker.book1D("tau_eta", "tau eta", etaHinfo.nbins, etaHinfo.min, etaHinfo.max);
-  phiTemp = ibooker.book1D("tau_phi", "tau phi", phiHinfo.nbins, phiHinfo.min, phiHinfo.max);
-  massTemp = ibooker.book1D("tau_mass", "tau mass", massHinfo.nbins, massHinfo.min, massHinfo.max);
-  puTemp = ibooker.book1D("tau_pu", "tau pileup", puHinfo.nbins, puHinfo.min, puHinfo.max);
-
-  // map the histograms
-  ptMap.insert(std::make_pair("", ptTemp));
-  etaMap.insert(std::make_pair("", etaTemp));
-  phiMap.insert(std::make_pair("", phiTemp));
-  massMap.insert(std::make_pair("", massTemp));
-  puMap.insert(std::make_pair("", puTemp));
-
-  // book decay mode histograms
-  decayModeFindingTemp = ibooker.book1D("tau_decayModeFinding",
-                                        "tau decayModeFinding",
-                                        decayModeFindingHinfo.nbins,
-                                        decayModeFindingHinfo.min,
-                                        decayModeFindingHinfo.max);
-  decayModeFindingMap.insert(std::make_pair("", decayModeFindingTemp));
-
-  decayModeTemp = ibooker.book1D("tau_decayMode_reco",
-                                 "DecayMode: Reconstructed tau",
-                                 decayModeHinfo.nbins,
-                                 decayModeHinfo.min,
-                                 decayModeHinfo.max);
-  decayModeMap.insert(std::make_pair("pftau", decayModeTemp));
-
-  decayModeTemp = ibooker.book1D(
-      "tau_decayMode_gen", "DecayMode: Generated tau", decayModeHinfo.nbins, decayModeHinfo.min, decayModeHinfo.max);
-  decayModeMap.insert(std::make_pair("gentau", decayModeTemp));
-
-  // book the deepTau histograms
-  byDeepTau2018v2p5VSerawTemp = ibooker.book1D("tau_byDeepTau2018v2p5VSeraw",
-                                               "byDeepTau2018v2p5VSeraw",
-                                               byDeepTau2018v2p5VSerawHinfo.nbins,
-                                               byDeepTau2018v2p5VSerawHinfo.min,
-                                               byDeepTau2018v2p5VSerawHinfo.max);
-  byDeepTau2018v2p5VSjetrawTemp = ibooker.book1D("tau_byDeepTau2018v2p5VSjetraw",
-                                                 "byDeepTau2018v2p5VSjetraw",
-                                                 byDeepTau2018v2p5VSjetrawHinfo.nbins,
-                                                 byDeepTau2018v2p5VSjetrawHinfo.min,
-                                                 byDeepTau2018v2p5VSjetrawHinfo.max);
-  byDeepTau2018v2p5VSmurawTemp = ibooker.book1D("tau_byDeepTau2018v2p5VSmuraw",
-                                                "byDeepTau2018v2p5VSmuraw",
-                                                byDeepTau2018v2p5VSmurawHinfo.nbins,
-                                                byDeepTau2018v2p5VSmurawHinfo.min,
-                                                byDeepTau2018v2p5VSmurawHinfo.max);
-
-  // map the deepTau histograms
-  byDeepTau2018v2p5VSerawMap.insert(std::make_pair("", byDeepTau2018v2p5VSerawTemp));
-  byDeepTau2018v2p5VSjetrawMap.insert(std::make_pair("", byDeepTau2018v2p5VSjetrawTemp));
-  byDeepTau2018v2p5VSmurawMap.insert(std::make_pair("", byDeepTau2018v2p5VSmurawTemp));
-
-  qcd = "QCD";
-  real_data = "RealData";
-  real_eledata = "RealElectronsData";
-  real_mudata = "RealMuonsData";
-  ztt = "ZTT";
-  zee = "ZEE";
-  zmm = "ZMM";
+  // define some strings for comparison with extensionName
+  std::string qcd = "QCD";
+  std::string real_data = "RealData";
+  std::string real_eledata = "RealElectronsData";
+  std::string real_mudata = "RealMuonsData";
+  std::string ztt = "ZTT";
+  std::string zee = "ZEE";
+  std::string zmm = "ZMM";
 
   // ---------------------------- /vsJet/ ---------------------------------------------
   if (extensionName_.compare(qcd) == 0 || extensionName_.compare(real_data) == 0 || extensionName_.compare(ztt) == 0) {
-    // ---------------------------- /vsJet/tight ---------------------------------------------
-    ibooker.setCurrentFolder("RecoTauV/miniAODValidation/" + extensionName_ + "/vsJet/tight");
 
-    ptTightvsJet = ibooker.book1D("tau_tightvsJet_pt", "tau_tightvsJet_pt", ptHinfo.nbins, ptHinfo.min, ptHinfo.max);
-    etaTightvsJet =
-        ibooker.book1D("tau_tightvsJet_eta", "tau_tightvsJet_eta", etaHinfo.nbins, etaHinfo.min, etaHinfo.max);
-    phiTightvsJet =
-        ibooker.book1D("tau_tightvsJet_phi", "tau_tightvsJet_phi", phiHinfo.nbins, phiHinfo.min, phiHinfo.max);
-    massTightvsJet =
-        ibooker.book1D("tau_tightvsJet_mass", "tau_tightvsJet_mass", massHinfo.nbins, massHinfo.min, massHinfo.max);
-    puTightvsJet = ibooker.book1D("tau_tightvsJet_pu", "tau_tightvsJet_pu", puHinfo.nbins, puHinfo.min, puHinfo.max);
+    ibooker.setCurrentFolder(main_folder + "/vsJet/tight");
+    for (auto& hVar : histoVars) {
+      auto [nBins, hMin, hMax] = hVar.second;
+      h_tausMatchedToRef_TightvsJet[hVar.first] = ibooker.book1D("tau_tightvsJet_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+    } 
 
-    ptTightvsJetMap.insert(std::make_pair("", ptTightvsJet));
-    etaTightvsJetMap.insert(std::make_pair("", etaTightvsJet));
-    phiTightvsJetMap.insert(std::make_pair("", phiTightvsJet));
-    massTightvsJetMap.insert(std::make_pair("", massTightvsJet));
-    puTightvsJetMap.insert(std::make_pair("", puTightvsJet));
+    ibooker.setCurrentFolder(main_folder + "/vsJet/medium");
+    for (auto& hVar : histoVars) {
+      auto [nBins, hMin, hMax] = hVar.second;
+      h_tausMatchedToRef_MediumvsJet[hVar.first] = ibooker.book1D("tau_mediumvsJet_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+    } 
 
-    // ---------------------------- /vsJet/medium -------------------------------------------
-    ibooker.setCurrentFolder("RecoTauV/miniAODValidation/" + extensionName_ + "/vsJet/medium");
-
-    ptMediumvsJet = ibooker.book1D("tau_mediumvsJet_pt", "tau_mediumvsJet_pt", ptHinfo.nbins, ptHinfo.min, ptHinfo.max);
-    etaMediumvsJet =
-        ibooker.book1D("tau_mediumvsJet_eta", "tau_mediumvsJet_eta", etaHinfo.nbins, etaHinfo.min, etaHinfo.max);
-    phiMediumvsJet =
-        ibooker.book1D("tau_mediumvsJet_phi", "tau_mediumvsJet_phi", phiHinfo.nbins, phiHinfo.min, phiHinfo.max);
-    massMediumvsJet =
-        ibooker.book1D("tau_mediumvsJet_mass", "tau_mediumvsJet_mass", massHinfo.nbins, massHinfo.min, massHinfo.max);
-    puMediumvsJet = ibooker.book1D("tau_mediumvsJet_pu", "tau_mediumvsJet_pu", puHinfo.nbins, puHinfo.min, puHinfo.max);
-
-    ptMediumvsJetMap.insert(std::make_pair("", ptMediumvsJet));
-    etaMediumvsJetMap.insert(std::make_pair("", etaMediumvsJet));
-    phiMediumvsJetMap.insert(std::make_pair("", phiMediumvsJet));
-    massMediumvsJetMap.insert(std::make_pair("", massMediumvsJet));
-    puMediumvsJetMap.insert(std::make_pair("", puMediumvsJet));
-
-    // ---------------------------- /vsJet/loose --------------------------------------------
-    ibooker.setCurrentFolder("RecoTauV/miniAODValidation/" + extensionName_ + "/vsJet/loose");
-
-    ptLoosevsJet = ibooker.book1D("tau_loosevsJet_pt", "tau_loosevsJet_pt", ptHinfo.nbins, ptHinfo.min, ptHinfo.max);
-    etaLoosevsJet =
-        ibooker.book1D("tau_loosevsJet_eta", "tau_loosevsJet_eta", etaHinfo.nbins, etaHinfo.min, etaHinfo.max);
-    phiLoosevsJet =
-        ibooker.book1D("tau_loosevsJet_phi", "tau_loosevsJet_phi", phiHinfo.nbins, phiHinfo.min, phiHinfo.max);
-    massLoosevsJet =
-        ibooker.book1D("tau_loosevsJet_mass", "tau_loosevsJet_mass", massHinfo.nbins, massHinfo.min, massHinfo.max);
-    puLoosevsJet = ibooker.book1D("tau_loosevsJet_pu", "tau_loosevsJet_pu", puHinfo.nbins, puHinfo.min, puHinfo.max);
-
-    ptLoosevsJetMap.insert(std::make_pair("", ptLoosevsJet));
-    etaLoosevsJetMap.insert(std::make_pair("", etaLoosevsJet));
-    phiLoosevsJetMap.insert(std::make_pair("", phiLoosevsJet));
-    massLoosevsJetMap.insert(std::make_pair("", massLoosevsJet));
-    puLoosevsJetMap.insert(std::make_pair("", puLoosevsJet));
+    ibooker.setCurrentFolder(main_folder + "/vsJet/loose");
+    for (auto& hVar : histoVars) {
+      auto [nBins, hMin, hMax] = hVar.second;
+      h_tausMatchedToRef_LoosevsJet[hVar.first] = ibooker.book1D("tau_loosevsJet_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+    } 
   }
+
   // ---------------------------- /vsEle/ ---------------------------------------------
-  //if (strcmp(extensionName_, real_eledata) == 0 || strcmp(extensionName_, zee) == 0 || strcmp(extensionName_, ztt) == 0) {
-  if (extensionName_.compare(real_eledata) == 0 || extensionName_.compare(zee) == 0 ||
-      extensionName_.compare(ztt) == 0) {
-    // ---------------------------- /vsEle/tight ---------------------------------------------
-    ibooker.setCurrentFolder("RecoTauV/miniAODValidation/" + extensionName_ + "/vsEle/tight");
+  if (extensionName_.compare(real_eledata) == 0 || extensionName_.compare(zee) == 0 || extensionName_.compare(ztt) == 0) {
 
-    ptTightvsEle = ibooker.book1D("tau_tightvsEle_pt", "tau_tightvsEle_pt", ptHinfo.nbins, ptHinfo.min, ptHinfo.max);
-    etaTightvsEle =
-        ibooker.book1D("tau_tightvsEle_eta", "tau_tightvsEle_eta", etaHinfo.nbins, etaHinfo.min, etaHinfo.max);
-    phiTightvsEle =
-        ibooker.book1D("tau_tightvsEle_phi", "tau_tightvsEle_phi", phiHinfo.nbins, phiHinfo.min, phiHinfo.max);
-    massTightvsEle =
-        ibooker.book1D("tau_tightvsEle_mass", "tau_tightvsEle_mass", massHinfo.nbins, massHinfo.min, massHinfo.max);
-    puTightvsEle = ibooker.book1D("tau_tightvsEle_pu", "tau_tightvsEle_pu", puHinfo.nbins, puHinfo.min, puHinfo.max);
+    ibooker.setCurrentFolder(main_folder + "/vsEle/tight");
+    for (auto& hVar : histoVars) {
+      auto [nBins, hMin, hMax] = hVar.second;
+      h_tausMatchedToRef_TightvsEle[hVar.first] = ibooker.book1D("tau_tightvsEle_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+    }
 
-    ptTightvsEleMap.insert(std::make_pair("", ptTightvsEle));
-    etaTightvsEleMap.insert(std::make_pair("", etaTightvsEle));
-    phiTightvsEleMap.insert(std::make_pair("", phiTightvsEle));
-    massTightvsEleMap.insert(std::make_pair("", massTightvsEle));
-    puTightvsEleMap.insert(std::make_pair("", puTightvsEle));
+    ibooker.setCurrentFolder(main_folder + "/vsEle/medium");
+    for (auto& hVar : histoVars) {
+      auto [nBins, hMin, hMax] = hVar.second;
+      h_tausMatchedToRef_MediumvsEle[hVar.first] = ibooker.book1D("tau_mediumvsEle_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+    }
 
-    // ---------------------------- /vsEle/medium -------------------------------------------
-    ibooker.setCurrentFolder("RecoTauV/miniAODValidation/" + extensionName_ + "/vsEle/medium");
-
-    ptMediumvsEle = ibooker.book1D("tau_mediumvsEle_pt", "tau_mediumvsEle_pt", ptHinfo.nbins, ptHinfo.min, ptHinfo.max);
-    etaMediumvsEle =
-        ibooker.book1D("tau_mediumvsEle_eta", "tau_mediumvsEle_eta", etaHinfo.nbins, etaHinfo.min, etaHinfo.max);
-    phiMediumvsEle =
-        ibooker.book1D("tau_mediumvsEle_phi", "tau_mediumvsEle_phi", phiHinfo.nbins, phiHinfo.min, phiHinfo.max);
-    massMediumvsEle =
-        ibooker.book1D("tau_mediumvsEle_mass", "tau_mediumvsEle_mass", massHinfo.nbins, massHinfo.min, massHinfo.max);
-    puMediumvsEle = ibooker.book1D("tau_mediumvsEle_pu", "tau_mediumvsEle_pu", puHinfo.nbins, puHinfo.min, puHinfo.max);
-
-    ptMediumvsEleMap.insert(std::make_pair("", ptMediumvsEle));
-    etaMediumvsEleMap.insert(std::make_pair("", etaMediumvsEle));
-    phiMediumvsEleMap.insert(std::make_pair("", phiMediumvsEle));
-    massMediumvsEleMap.insert(std::make_pair("", massMediumvsEle));
-    puMediumvsEleMap.insert(std::make_pair("", puMediumvsEle));
-
-    // ---------------------------- /vsEle/loose --------------------------------------------
-    ibooker.setCurrentFolder("RecoTauV/miniAODValidation/" + extensionName_ + "/vsEle/loose");
-
-    ptLoosevsEle = ibooker.book1D("tau_loosevsEle_pt", "tau_loosevsEle_pt", ptHinfo.nbins, ptHinfo.min, ptHinfo.max);
-    etaLoosevsEle =
-        ibooker.book1D("tau_loosevsEle_eta", "tau_loosevsEle_eta", etaHinfo.nbins, etaHinfo.min, etaHinfo.max);
-    phiLoosevsEle =
-        ibooker.book1D("tau_loosevsEle_phi", "tau_loosevsEle_phi", phiHinfo.nbins, phiHinfo.min, phiHinfo.max);
-    massLoosevsEle =
-        ibooker.book1D("tau_loosevsEle_mass", "tau_loosevsEle_mass", massHinfo.nbins, massHinfo.min, massHinfo.max);
-    puLoosevsEle = ibooker.book1D("tau_loosevsEle_pu", "tau_loosevsEle_pu", puHinfo.nbins, puHinfo.min, puHinfo.max);
-
-    ptLoosevsEleMap.insert(std::make_pair("", ptLoosevsEle));
-    etaLoosevsEleMap.insert(std::make_pair("", etaLoosevsEle));
-    phiLoosevsEleMap.insert(std::make_pair("", phiLoosevsEle));
-    massLoosevsEleMap.insert(std::make_pair("", massLoosevsEle));
-    puLoosevsEleMap.insert(std::make_pair("", puLoosevsEle));
+    ibooker.setCurrentFolder(main_folder + "/vsEle/loose");
+    for (auto& hVar : histoVars) {
+      auto [nBins, hMin, hMax] = hVar.second;
+      h_tausMatchedToRef_LoosevsEle[hVar.first] = ibooker.book1D("tau_loosevsEle_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+    }
   }
+
   // ---------------------------- /vsMuo/ ---------------------------------------------
-  //if (strcmp(extensionName_, real_mudata) == 0 || strcmp(extensionName_, zmm) == 0 || strcmp(extensionName_, ztt) == 0) {
-  if (extensionName_.compare(real_mudata) == 0 || extensionName_.compare(zmm) == 0 ||
-      extensionName_.compare(ztt) == 0) {
-    // ---------------------------- /vsMuo/tight ---------------------------------------------
-    ibooker.setCurrentFolder("RecoTauV/miniAODValidation/" + extensionName_ + "/vsMuo/tight");
+  if (extensionName_.compare(real_mudata) == 0 || extensionName_.compare(zmm) == 0 || extensionName_.compare(ztt) == 0) {
 
-    ptTightvsMuo = ibooker.book1D("tau_tightvsMuo_pt", "tau_tightvsMuo_pt", ptHinfo.nbins, ptHinfo.min, ptHinfo.max);
-    etaTightvsMuo =
-        ibooker.book1D("tau_tightvsMuo_eta", "tau_tightvsMuo_eta", etaHinfo.nbins, etaHinfo.min, etaHinfo.max);
-    phiTightvsMuo =
-        ibooker.book1D("tau_tightvsMuo_phi", "tau_tightvsMuo_phi", phiHinfo.nbins, phiHinfo.min, phiHinfo.max);
-    massTightvsMuo =
-        ibooker.book1D("tau_tightvsMuo_mass", "tau_tightvsMuo_mass", massHinfo.nbins, massHinfo.min, massHinfo.max);
-    puTightvsMuo = ibooker.book1D("tau_tightvsMuo_pu", "tau_tightvsMuo_pu", puHinfo.nbins, puHinfo.min, puHinfo.max);
+    ibooker.setCurrentFolder(main_folder + "/vsMuo/tight");
+    for (auto& hVar : histoVars) {
+      auto [nBins, hMin, hMax] = hVar.second;
+      h_tausMatchedToRef_TightvsMuo[hVar.first] = ibooker.book1D("tau_tightvsMuo_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+    }
 
-    ptTightvsMuoMap.insert(std::make_pair("", ptTightvsMuo));
-    etaTightvsMuoMap.insert(std::make_pair("", etaTightvsMuo));
-    phiTightvsMuoMap.insert(std::make_pair("", phiTightvsMuo));
-    massTightvsMuoMap.insert(std::make_pair("", massTightvsMuo));
-    puTightvsMuoMap.insert(std::make_pair("", puTightvsMuo));
+    ibooker.setCurrentFolder(main_folder + "/vsMuo/medium");
+    for (auto& hVar : histoVars) {
+      auto [nBins, hMin, hMax] = hVar.second;
+      h_tausMatchedToRef_MediumvsMuo[hVar.first] = ibooker.book1D("tau_mediumvsMuo_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+    }
 
-    // ---------------------------- /vsMuo/medium -------------------------------------------
-    ibooker.setCurrentFolder("RecoTauV/miniAODValidation/" + extensionName_ + "/vsMuo/medium");
-
-    ptMediumvsMuo = ibooker.book1D("tau_mediumvsMuo_pt", "tau_mediumvsMuo_pt", ptHinfo.nbins, ptHinfo.min, ptHinfo.max);
-    etaMediumvsMuo =
-        ibooker.book1D("tau_mediumvsMuo_eta", "tau_mediumvsMuo_eta", etaHinfo.nbins, etaHinfo.min, etaHinfo.max);
-    phiMediumvsMuo =
-        ibooker.book1D("tau_mediumvsMuo_phi", "tau_mediumvsMuo_phi", phiHinfo.nbins, phiHinfo.min, phiHinfo.max);
-    massMediumvsMuo =
-        ibooker.book1D("tau_mediumvsMuo_mass", "tau_mediumvsMuo_mass", massHinfo.nbins, massHinfo.min, massHinfo.max);
-    puMediumvsMuo = ibooker.book1D("tau_mediumvsMuo_pu", "tau_mediumvsMuo_pu", puHinfo.nbins, puHinfo.min, puHinfo.max);
-
-    ptMediumvsMuoMap.insert(std::make_pair("", ptMediumvsMuo));
-    etaMediumvsMuoMap.insert(std::make_pair("", etaMediumvsMuo));
-    phiMediumvsMuoMap.insert(std::make_pair("", phiMediumvsMuo));
-    massMediumvsMuoMap.insert(std::make_pair("", massMediumvsMuo));
-    puMediumvsMuoMap.insert(std::make_pair("", puMediumvsMuo));
-
-    // ---------------------------- /vsMuo/loose --------------------------------------------
-    ibooker.setCurrentFolder("RecoTauV/miniAODValidation/" + extensionName_ + "/vsMuo/loose");
-
-    ptLoosevsMuo = ibooker.book1D("tau_loosevsMuo_pt", "tau_loosevsMuo_pt", ptHinfo.nbins, ptHinfo.min, ptHinfo.max);
-    etaLoosevsMuo =
-        ibooker.book1D("tau_loosevsMuo_eta", "tau_loosevsMuo_eta", etaHinfo.nbins, etaHinfo.min, etaHinfo.max);
-    phiLoosevsMuo =
-        ibooker.book1D("tau_loosevsMuo_phi", "tau_loosevsMuo_phi", phiHinfo.nbins, phiHinfo.min, phiHinfo.max);
-    massLoosevsMuo =
-        ibooker.book1D("tau_loosevsMuo_mass", "tau_loosevsMuo_mass", massHinfo.nbins, massHinfo.min, massHinfo.max);
-    puLoosevsMuo = ibooker.book1D("tau_loosevsMuo_pu", "tau_loosevsMuo_pu", puHinfo.nbins, puHinfo.min, puHinfo.max);
-
-    ptLoosevsMuoMap.insert(std::make_pair("", ptLoosevsMuo));
-    etaLoosevsMuoMap.insert(std::make_pair("", etaLoosevsMuo));
-    phiLoosevsMuoMap.insert(std::make_pair("", phiLoosevsMuo));
-    massLoosevsMuoMap.insert(std::make_pair("", massLoosevsMuo));
-    puLoosevsMuoMap.insert(std::make_pair("", puLoosevsMuo));
+    ibooker.setCurrentFolder(main_folder + "/vsMuo/loose");
+    for (auto& hVar : histoVars) {
+      auto [nBins, hMin, hMax] = hVar.second;
+      h_tausMatchedToRef_LoosevsMuo[hVar.first] = ibooker.book1D("tau_loosevsMuo_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+    }
   }
 }
+
 void TauValidationMiniAOD::analyze(const edm::Event &iEvent, const edm::EventSetup &iSetup) {
+
   // create a handle to the tau collection
-  edm::Handle<pat::TauCollection> taus;
-  bool isTau = iEvent.getByToken(tauCollection_, taus);
-  if (!isTau) {
-    edm::LogWarning("TauValidationMiniAOD") << " Tau collection not found while running TauValidationMiniAOD.cc ";
+  edm::Handle<pat::TauCollection> patTaus;
+  edm::Handle<reco::PFTauCollection> pfTaus;
+  if (isMini) {
+    iEvent.getByToken(patTauToken_, patTaus);
+    if (!patTaus.isValid()) {
+      edm::LogPrint("TauValidationMiniAOD") << " Pat Tau collection not found while running TauValidationMiniAOD.cc ";
+      return;
+    }
+    std::cout << "Pat Tau collection size: " << patTaus->size() << std::endl; // [DEBUG]
+  } else if (isReco) {
+    iEvent.getByToken(pfTauToken_, pfTaus);
+    if (!pfTaus.isValid()) {
+      edm::LogPrint("TauValidationMiniAOD") << " Pf Tau collection not found while running TauValidationMiniAOD.cc ";
+      return;
+    }
+    std::cout << "Pf Tau collection size: " << pfTaus->size() << std::endl; // [DEBUG]
+  }
+
+  // create a handle to the reference collection
+  typedef edm::View<reco::Candidate> refCandidateCollection;
+  edm::Handle<refCandidateCollection> genRefParticles;
+  bool isRef = iEvent.getByToken(genRefToken_, genRefParticles);
+  if (!isRef) {
+    edm::LogPrint("TauValidationMiniAOD") << " Reference collection not found while running TauValidationMiniAOD.cc ";
     return;
   }
+  std::cout << "Reference collection " << extensionName_ << " size: " << genRefParticles->size() << std::endl; // [DEBUG]
 
   // create a handle to the gen Part collection
   edm::Handle<std::vector<reco::GenParticle>> genParticles;
   iEvent.getByToken(prunedGenToken_, genParticles);
-
-  // create a handle to the reference collection
-  typedef edm::View<reco::Candidate> refCandidateCollection;
-  edm::Handle<refCandidateCollection> ReferenceCollection;
-  bool isRef = iEvent.getByToken(refCollectionInputTagToken_, ReferenceCollection);
-  if (!isRef) {
-    std::cerr << "ERROR: Reference collection not found while running TauValidationMiniAOD.cc \n " << std::endl;
-    return;
+  if (!genParticles.isValid()) {
+    edm::LogPrint("TauValidationMiniAOD") << " GenParticle collection not found while running TauValidationMiniAOD.cc ";
   }
+  std::cout << "GenParticle collection size: " << genParticles->size() << std::endl; // [DEBUG]
 
   // create a handle to the primary vertex collection
-  Handle<std::vector<reco::Vertex>> pvHandle;
-  bool isPV = iEvent.getByToken(primaryVertexCollectionToken_, pvHandle);
+  Handle<std::vector<reco::Vertex>> primaryVertices;
+  bool isPV = iEvent.getByToken(pvToken_, primaryVertices);
   if (!isPV) {
-    edm::LogWarning("TauValidationMiniAOD") << " PV collection not found while running TauValidationMiniAOD.cc ";
+    edm::LogPrint("TauValidationMiniAOD") << " PV collection not found while running TauValidationMiniAOD.cc ";
   }
-  std::vector<const reco::GenParticle *> GenTaus;
+  std::cout << "PV collection size: " << primaryVertices->size() << std::endl; // [DEBUG]
 
-  // dR match reference object to tau
-  for (refCandidateCollection::const_iterator RefJet = ReferenceCollection->begin();
-       RefJet != ReferenceCollection->end();
-       RefJet++) {
-    float dRmin = 0.15;
-    int matchedTauIndex = -99;
-    float gendRmin = 0.15;
-    int genmatchedTauIndex = -99;
+  float dR2min = 0.15;
+  int matchedTauIndex = -99;
+  float gendR2min = 0.15;
+  int genmatchedTauIndex = -99;
 
-    // find best matched tau
-    for (unsigned iTau = 0; iTau < taus->size(); iTau++) {
-      pat::TauRef tau(taus, iTau);
+  // dR match between gen reference object (taus, electrons, jets, muons, ...) and tau
+  for (refCandidateCollection::const_iterator genRef = genRefParticles->begin(); genRef != genRefParticles->end(); genRef++) {
 
-      float dR = deltaR2(tau->eta(), tau->phi(), RefJet->eta(), RefJet->phi());
-      if (dR < dRmin) {
-        dRmin = dR;
-        matchedTauIndex = iTau;
+    float tau_pt = -1;
+    float tau_eta = -99;
+    float tau_phi = -99;
+    float tau_mass = -1;
+    int tau_decayMode = -99;
+    uint nTaus = -1;
+
+    // find best matched tau to reference gen particle
+    if (isMini) {
+      nTaus = patTaus->size();
+      for (unsigned iTau = 0; iTau < nTaus; iTau++) {
+        pat::TauRef tau(patTaus, iTau);
+        float dR2 = deltaR2(tau->eta(), tau->phi(), genRef->eta(), genRef->phi());
+        if (dR2 < dR2min) {
+          dR2min = dR2;
+          matchedTauIndex = iTau;
+          tau_pt = tau->pt();
+          tau_eta = tau->eta();
+          tau_phi = tau->phi();
+          tau_mass = tau->mass();
+          tau_decayMode = tau->decayMode();
+        }
+      }
+    } else if (isReco) {
+      nTaus = pfTaus->size();
+      for (unsigned iTau = 0; iTau < nTaus; iTau++) {
+        reco::PFTauRef tau(pfTaus, iTau);
+        float dR2 = deltaR2(tau->eta(), tau->phi(), genRef->eta(), genRef->phi());
+        if (dR2 < dR2min) {
+          dR2min = dR2;
+          matchedTauIndex = iTau;
+          tau_pt = tau->pt();
+          tau_eta = tau->eta();
+          tau_phi = tau->phi();
+          tau_mass = tau->mass();
+          tau_decayMode = tau->decayMode();
+        }
       }
     }
-    if (dRmin < 0.15) {
-      pat::TauRef matchedTau(taus, matchedTauIndex);
 
-      // fill histograms with matchedTau quantities
-      ptMap.find("")->second->Fill(matchedTau->pt());
-      etaMap.find("")->second->Fill(matchedTau->eta());
-      phiMap.find("")->second->Fill(matchedTau->phi());
-      massMap.find("")->second->Fill(matchedTau->mass());
-      puMap.find("")->second->Fill(pvHandle->size());
-      decayModeMap.find("pftau")->second->Fill(matchedTau->decayMode());
+    if (dR2min < 0.15) {
+      std::cout << "GenRef jet matched to tau index: " << matchedTauIndex << std::endl; // [DEBUG]
+      std::cout << "GenRef jet: " << genRef->pt() << ", " << genRef->eta() << ", " << genRef->phi() << std::endl; // [DEBUG]
+      std::cout << "Matched pt: " << tau_pt << ", " << tau_eta << ", " << tau_phi << std::endl; // [DEBUG]
 
-      // fill select discriminators with matchedTau quantities
-      if (matchedTau->isTauIDAvailable("decayModeFindingNewDMs"))
-        decayModeFindingMap.find("")->second->Fill(matchedTau->tauID("decayModeFindingNewDMs"));
-      if (matchedTau->isTauIDAvailable("byDeepTau2018v2p5VSeraw"))
-        byDeepTau2018v2p5VSerawMap.find("")->second->Fill(matchedTau->tauID("byDeepTau2018v2p5VSeraw"));
-      if (matchedTau->isTauIDAvailable("byDeepTau2018v2p5VSjetraw"))
-        byDeepTau2018v2p5VSjetrawMap.find("")->second->Fill(matchedTau->tauID("byDeepTau2018v2p5VSjetraw"));
-      if (matchedTau->isTauIDAvailable("byDeepTau2018v2p5VSmuraw"))
-        byDeepTau2018v2p5VSmurawMap.find("")->second->Fill(matchedTau->tauID("byDeepTau2018v2p5VSmuraw"));
-
-      // fill tau mass for decay modes 0,1+2,5,6,7,10,11
-      if (matchedTau->decayMode() == 0) {
-        mtau_dm0Map.find("")->second->Fill(matchedTau->mass());
-        pTOverProng_dm0Map.find("")->second->Fill(matchedTau->pt(), matchedTau->ptLeadChargedCand());
-      } else if (matchedTau->decayMode() == 1 || matchedTau->decayMode() == 2) {
-        mtau_dm1p2Map.find("")->second->Fill(matchedTau->mass());
-        pTOverProng_dm1p2Map.find("")->second->Fill(matchedTau->pt(), matchedTau->ptLeadChargedCand());
-      } else if (matchedTau->decayMode() == 5) {
-        mtau_dm5Map.find("")->second->Fill(matchedTau->mass());
-        pTOverProng_dm5Map.find("")->second->Fill(matchedTau->pt(), matchedTau->ptLeadChargedCand());
-      } else if (matchedTau->decayMode() == 6) {
-        mtau_dm6Map.find("")->second->Fill(matchedTau->mass());
-        pTOverProng_dm6Map.find("")->second->Fill(matchedTau->pt(), matchedTau->ptLeadChargedCand());
-      } else if (matchedTau->decayMode() == 10) {
-        mtau_dm10Map.find("")->second->Fill(matchedTau->mass());
-        pTOverProng_dm10Map.find("")->second->Fill(matchedTau->pt(), matchedTau->ptLeadChargedCand());
-      } else if (matchedTau->decayMode() == 11) {
-        mtau_dm11Map.find("")->second->Fill(matchedTau->mass());
-        pTOverProng_dm11Map.find("")->second->Fill(matchedTau->pt(), matchedTau->ptLeadChargedCand());
-      }
+      // fill kinematics with matched Tau quantities
+      h_tausMatchedToRef_["pt"]->Fill(tau_pt);
+      h_tausMatchedToRef_["eta"]->Fill(tau_eta);
+      h_tausMatchedToRef_["phi"]->Fill(tau_phi);
+      h_tausMatchedToRef_["mass"]->Fill(tau_mass);
+      h_tausMatchedToRef_["pu"]->Fill(primaryVertices->size());
+      decayModeTauReco->Fill(tau_decayMode);
 
       // fill decay mode population plot
-      ntau_vs_dmMap.find("")->second->Fill(taus->size(), matchedTau->decayMode());
+      nTau_vs_dm->Fill(nTaus, tau_decayMode);
 
-      //Fill decay mode migration 2D histogragms
-      //First do a gen Matching
-      unsigned genindex = 0;
-      for (const auto &genParticle : *genParticles) {
-        if (abs(genParticle.pdgId()) == 15) {
-          float gendR = deltaR2(matchedTau->eta(), matchedTau->phi(), genParticle.eta(), genParticle.phi());
-          if (gendR < gendRmin) {
-            gendRmin = gendR;
-            genmatchedTauIndex = genindex;
+      // fill tau mass for decay modes 0,1+2,5,6,7,10,11
+      for (size_t i = 0; i < dm_list.size(); ++i) {
+          const auto& dms = dm_list[i].first;
+          if (std::find(dms.begin(), dms.end(), tau_decayMode) != dms.end()) {
+              h_TauMass_dm_[i]->Fill(tau_mass);
           }
-        }
-        genindex = genindex + 1;
       }
 
-      if (gendRmin < 0.15) {
+      // find corresponding tau gen particle
+      for (unsigned iGen = 0; iGen < genParticles->size(); iGen++) {
+        const reco::GenParticle &gentau = genParticles->at(iGen);
+        if (abs(gentau.pdgId()) == 15) {
+          float gendR2 = deltaR2(tau_eta, tau_phi, gentau.eta(), gentau.phi());
+          if (gendR2 < gendR2min) {
+            gendR2min = gendR2;
+            genmatchedTauIndex = iGen;
+          }
+        }
+      }
+
+      // fill decay mode migration 2D histogragms
+      if (gendR2min < 0.15) {
         int nPi0s = 0;
         int nPis = 0;
-        auto &gentau = genParticles->at(genmatchedTauIndex);
+        const reco::GenParticle &gentau = genParticles->at(genmatchedTauIndex);
         for (unsigned idtr = 0; idtr < gentau.numberOfDaughters(); idtr++) {
           const reco::GenParticle *dtr = dynamic_cast<const reco::GenParticle *>(gentau.daughter(idtr));
           int dtrpdgID = std::abs(dtr->pdgId());
           int dtrstatus = dtr->status();
-          if (dtrpdgID == 12 || dtrpdgID == 14 || dtrpdgID == 16)
+          if (dtrpdgID == 12 || dtrpdgID == 14 || dtrpdgID == 16) // neutrinos
             continue;
-          if (dtrpdgID == 111 || dtrpdgID == 311)
+          if (dtrpdgID == 111 || dtrpdgID == 311) // neutral pions and kaons
             nPi0s++;
-          else if (dtrpdgID == 211 || dtrpdgID == 321)
+          else if (dtrpdgID == 211 || dtrpdgID == 321) // charged pions and kaons
             nPis++;
-          else if (dtrpdgID == 15 && dtrstatus == 2 /*&& dtr->isLastCopy()*/) {
+          else if (dtrpdgID == 15 && dtrstatus == 2) {
             for (unsigned idtr2 = 0; idtr2 < dtr->numberOfDaughters(); idtr2++) {
               const reco::GenParticle *dtr2 = dynamic_cast<const reco::GenParticle *>(dtr->daughter(idtr2));
               int dtr2pdgID = std::abs(dtr2->pdgId());
-              if (dtr2pdgID == 12 || dtr2pdgID == 14 || dtr2pdgID == 16)
+              if (dtr2pdgID == 12 || dtr2pdgID == 14 || dtr2pdgID == 16) // neutrinos
                 continue;
-              if (dtr2pdgID == 111 || dtr2pdgID == 311)
+              if (dtr2pdgID == 111 || dtr2pdgID == 311) // neutral pions and kaons
                 nPi0s++;
-              else if (dtr2pdgID == 211 || dtr2pdgID == 321)
+              else if (dtr2pdgID == 211 || dtr2pdgID == 321) // charged pions and kaons
                 nPis++;
             }
           }
         }
-        int genTau_dm = findDecayMode(nPis, nPi0s);
-        decayModeMap.find("gentau")->second->Fill(genTau_dm);
-        dmMigrationMap.find("")->second->Fill(genTau_dm, matchedTau->decayMode());
+        int genTau_decayMode = findDecayMode(nPis, nPi0s);
+        decayModeTauGen->Fill(genTau_decayMode);
+        dmMigration->Fill(genTau_decayMode, tau_decayMode);
       }
 
-      // count number of taus passing each discriminator's selection cut
-      unsigned j = 0;
-      for (const auto &it : discriminators_) {
-        string currentDiscriminator = it.getParameter<string>("discriminator");
-        double selectionCut = it.getParameter<double>("selectionCut");
-        summaryMap.find("Den")->second->Fill(j);
-        if (matchedTau->isTauIDAvailable(currentDiscriminator) &&
-            matchedTau->tauID(currentDiscriminator) >= selectionCut)
-          summaryMap.find("Num")->second->Fill(j);
-        j = j + 1;
+      // fill histograms for pat tau collection variables
+      if (isMini) {
+        pat::TauRef matchedTau(patTaus, matchedTauIndex);
+
+        // fill select discriminators with matched Tau quantities
+        if (matchedTau->isTauIDAvailable("decayModeFindingNewDMs"))
+          decayModeFinding->Fill(matchedTau->tauID("decayModeFindingNewDMs"));
+        if (matchedTau->isTauIDAvailable("byDeepTau2018v2p5VSeraw"))
+          DeepTau2018v2p5VSele->Fill(matchedTau->tauID("byDeepTau2018v2p5VSeraw"));
+        if (matchedTau->isTauIDAvailable("byDeepTau2018v2p5VSjetraw"))
+          DeepTau2018v2p5VSjet->Fill(matchedTau->tauID("byDeepTau2018v2p5VSjetraw"));
+        if (matchedTau->isTauIDAvailable("byDeepTau2018v2p5VSmuraw"))
+          DeepTau2018v2p5VSmuo->Fill(matchedTau->tauID("byDeepTau2018v2p5VSmuraw"));
+
+        // fill tau mass for decay modes 0,1+2,5,6,7,10,11
+        float tau_ptLeadChargedCand = matchedTau->ptLeadChargedCand();
+        for (size_t i = 0; i < dm_list.size(); ++i) {
+            const auto& dms = dm_list[i].first;
+            if (std::find(dms.begin(), dms.end(), tau_decayMode) != dms.end()) {
+                h_pTOverProng_dm_[i]->Fill(tau_pt, tau_ptLeadChargedCand);
+            }
+        }
+
+        // count number of taus passing each discriminator's selection cut
+        for (uint j = 0; j < discriminators_.size(); j++) {
+          string currentDiscriminator = discriminators_[j].getParameter<string>("discriminator");
+          double selectionCut = discriminators_[j].getParameter<double>("selectionCut");
+          summaryMap.find("Den")->second->Fill(j);
+          if (matchedTau->isTauIDAvailable(currentDiscriminator) &&
+              matchedTau->tauID(currentDiscriminator) >= selectionCut)
+            summaryMap.find("Num")->second->Fill(j);
+        }
+
+        // fill the discriminator histograms
+        if (extensionName_.compare(qcd) == 0 || extensionName_.compare(real_data) == 0 ||
+            extensionName_.compare(ztt) == 0) { // VS JET
+          // vsJet/tight
+          if (matchedTau->isTauIDAvailable("byTightDeepTau2018v2p5VSjet") &&
+              matchedTau->tauID("byTightDeepTau2018v2p5VSjet") >= 0.5) {
+            h_tausMatchedToRef_TightvsJet["pt"]->Fill(tau_pt);
+            h_tausMatchedToRef_TightvsJet["eta"]->Fill(tau_eta);
+            h_tausMatchedToRef_TightvsJet["phi"]->Fill(tau_phi);
+            h_tausMatchedToRef_TightvsJet["mass"]->Fill(tau_mass);
+            h_tausMatchedToRef_TightvsJet["pu"]->Fill(primaryVertices->size());
+          }
+          // vsJet/medium
+          if (matchedTau->isTauIDAvailable("byMediumDeepTau2018v2p5VSjet") &&
+              matchedTau->tauID("byMediumDeepTau2018v2p5VSjet") >= 0.5) {
+            h_tausMatchedToRef_MediumvsJet["pt"]->Fill(tau_pt);
+            h_tausMatchedToRef_MediumvsJet["eta"]->Fill(tau_eta);
+            h_tausMatchedToRef_MediumvsJet["phi"]->Fill(tau_phi);
+            h_tausMatchedToRef_MediumvsJet["mass"]->Fill(tau_mass);
+            h_tausMatchedToRef_MediumvsJet["pu"]->Fill(primaryVertices->size());
+          }
+          // vsJet/loose
+          if (matchedTau->isTauIDAvailable("byLooseDeepTau2018v2p5VSjet") &&
+              matchedTau->tauID("byLooseDeepTau2018v2p5VSjet") >= 0.5) {
+            h_tausMatchedToRef_LoosevsJet["pt"]->Fill(tau_pt);
+            h_tausMatchedToRef_LoosevsJet["eta"]->Fill(tau_eta);
+            h_tausMatchedToRef_LoosevsJet["phi"]->Fill(tau_phi);
+            h_tausMatchedToRef_LoosevsJet["mass"]->Fill(tau_mass);
+            h_tausMatchedToRef_LoosevsJet["pu"]->Fill(primaryVertices->size());
+          }
+        }
+
+        if (extensionName_.compare(real_eledata) == 0 || extensionName_.compare(zee) == 0 ||
+            extensionName_.compare(ztt) == 0) {  // VS ELE
+          // vsEle/tight
+          if (matchedTau->isTauIDAvailable("byTightDeepTau2018v2p5VSe") &&
+              matchedTau->tauID("byTightDeepTau2018v2p5VSe") >= 0.5) {
+            h_tausMatchedToRef_TightvsEle["pt"]->Fill(tau_pt);
+            h_tausMatchedToRef_TightvsEle["eta"]->Fill(tau_eta);
+            h_tausMatchedToRef_TightvsEle["phi"]->Fill(tau_phi);
+            h_tausMatchedToRef_TightvsEle["mass"]->Fill(tau_mass);
+            h_tausMatchedToRef_TightvsEle["pu"]->Fill(primaryVertices->size());
+          }
+          // vsEle/medium
+          if (matchedTau->isTauIDAvailable("byMediumDeepTau2018v2p5VSe") &&
+              matchedTau->tauID("byMediumDeepTau2018v2p5VSe") >= 0.5) {
+            h_tausMatchedToRef_MediumvsEle["pt"]->Fill(tau_pt);
+            h_tausMatchedToRef_MediumvsEle["eta"]->Fill(tau_eta);
+            h_tausMatchedToRef_MediumvsEle["phi"]->Fill(tau_phi);
+            h_tausMatchedToRef_MediumvsEle["mass"]->Fill(tau_mass);
+            h_tausMatchedToRef_MediumvsEle["pu"]->Fill(primaryVertices->size());
+          }
+          // vsEle/loose
+          if (matchedTau->isTauIDAvailable("byLooseDeepTau2018v2p5VSe") &&
+              matchedTau->tauID("byLooseDeepTau2018v2p5VSe") >= 0.5) {
+            h_tausMatchedToRef_LoosevsEle["pt"]->Fill(tau_pt);
+            h_tausMatchedToRef_LoosevsEle["eta"]->Fill(tau_eta);
+            h_tausMatchedToRef_LoosevsEle["phi"]->Fill(tau_phi);
+            h_tausMatchedToRef_LoosevsEle["mass"]->Fill(tau_mass);
+            h_tausMatchedToRef_LoosevsEle["pu"]->Fill(primaryVertices->size());
+          }
+        }
+
+        if (extensionName_.compare(real_mudata) == 0 || extensionName_.compare(zmm) == 0 ||
+            extensionName_.compare(ztt) == 0) {  // VS MU
+          // vsMuo/tight
+          if (matchedTau->isTauIDAvailable("byTightDeepTau2018v2p5VSmu") &&
+              matchedTau->tauID("byTightDeepTau2018v2p5VSmu") >= 0.5) {
+            h_tausMatchedToRef_TightvsMuo["pt"]->Fill(tau_pt);
+            h_tausMatchedToRef_TightvsMuo["eta"]->Fill(tau_eta);
+            h_tausMatchedToRef_TightvsMuo["phi"]->Fill(tau_phi);
+            h_tausMatchedToRef_TightvsMuo["mass"]->Fill(tau_mass);
+            h_tausMatchedToRef_TightvsMuo["pu"]->Fill(primaryVertices->size());
+          }
+          // vsMuo/medium
+          if (matchedTau->isTauIDAvailable("byMediumDeepTau2018v2p5VSmu") &&
+              matchedTau->tauID("byMediumDeepTau2018v2p5VSmu") >= 0.5) {
+            h_tausMatchedToRef_MediumvsMuo["pt"]->Fill(tau_pt);
+            h_tausMatchedToRef_MediumvsMuo["eta"]->Fill(tau_eta);
+            h_tausMatchedToRef_MediumvsMuo["phi"]->Fill(tau_phi);
+            h_tausMatchedToRef_MediumvsMuo["mass"]->Fill(tau_mass);
+            h_tausMatchedToRef_MediumvsMuo["pu"]->Fill(primaryVertices->size());
+          }
+          // vsMuo/loose
+          if (matchedTau->isTauIDAvailable("byLooseDeepTau2018v2p5VSmu") &&
+              matchedTau->tauID("byLooseDeepTau2018v2p5VSmu") >= 0.5) {
+            h_tausMatchedToRef_LoosevsMuo["pt"]->Fill(tau_pt);
+            h_tausMatchedToRef_LoosevsMuo["eta"]->Fill(tau_eta);
+            h_tausMatchedToRef_LoosevsMuo["phi"]->Fill(tau_phi);
+            h_tausMatchedToRef_LoosevsMuo["mass"]->Fill(tau_mass);
+            h_tausMatchedToRef_LoosevsMuo["pu"]->Fill(primaryVertices->size());
+          }
+        }
       }
 
-      // fill the vsXXX histograms against (jet, e, mu)
-      // vsJet/
-      if (extensionName_.compare(qcd) == 0 || extensionName_.compare(real_data) == 0 ||
-          extensionName_.compare(ztt) == 0) {
-        // vsJet/tight
-        if (matchedTau->isTauIDAvailable("byTightDeepTau2018v2p5VSjet") &&
-            matchedTau->tauID("byTightDeepTau2018v2p5VSjet") >= 0.5) {
-          ptTightvsJetMap.find("")->second->Fill(matchedTau->pt());
-          etaTightvsJetMap.find("")->second->Fill(matchedTau->eta());
-          phiTightvsJetMap.find("")->second->Fill(matchedTau->phi());
-          massTightvsJetMap.find("")->second->Fill(matchedTau->mass());
-          puTightvsJetMap.find("")->second->Fill(pvHandle->size());
-        }
-        // vsJet/medium
-        if (matchedTau->isTauIDAvailable("byMediumDeepTau2018v2p5VSjet") &&
-            matchedTau->tauID("byMediumDeepTau2018v2p5VSjet") >= 0.5) {
-          ptMediumvsJetMap.find("")->second->Fill(matchedTau->pt());
-          etaMediumvsJetMap.find("")->second->Fill(matchedTau->eta());
-          phiMediumvsJetMap.find("")->second->Fill(matchedTau->phi());
-          massMediumvsJetMap.find("")->second->Fill(matchedTau->mass());
-          puMediumvsJetMap.find("")->second->Fill(pvHandle->size());
-        }
-        // vsJet/loose
-        if (matchedTau->isTauIDAvailable("byLooseDeepTau2018v2p5VSjet") &&
-            matchedTau->tauID("byLooseDeepTau2018v2p5VSjet") >= 0.5) {
-          ptLoosevsJetMap.find("")->second->Fill(matchedTau->pt());
-          etaLoosevsJetMap.find("")->second->Fill(matchedTau->eta());
-          phiLoosevsJetMap.find("")->second->Fill(matchedTau->phi());
-          massLoosevsJetMap.find("")->second->Fill(matchedTau->mass());
-          puLoosevsJetMap.find("")->second->Fill(pvHandle->size());
-        }
-      }
-      // vsEle/
-      if (extensionName_.compare(real_eledata) == 0 || extensionName_.compare(zee) == 0 ||
-          extensionName_.compare(ztt) == 0) {
-        // vsEle/tight
-        if (matchedTau->isTauIDAvailable("byTightDeepTau2018v2p5VSe") &&
-            matchedTau->tauID("byTightDeepTau2018v2p5VSe") >= 0.5) {
-          ptTightvsEleMap.find("")->second->Fill(matchedTau->pt());
-          etaTightvsEleMap.find("")->second->Fill(matchedTau->eta());
-          phiTightvsEleMap.find("")->second->Fill(matchedTau->phi());
-          massTightvsEleMap.find("")->second->Fill(matchedTau->mass());
-          puTightvsEleMap.find("")->second->Fill(pvHandle->size());
-        }
-        // vsEle/medium
-        if (matchedTau->isTauIDAvailable("byMediumDeepTau2018v2p5VSe") &&
-            matchedTau->tauID("byMediumDeepTau2018v2p5VSe") >= 0.5) {
-          ptMediumvsEleMap.find("")->second->Fill(matchedTau->pt());
-          etaMediumvsEleMap.find("")->second->Fill(matchedTau->eta());
-          phiMediumvsEleMap.find("")->second->Fill(matchedTau->phi());
-          massMediumvsEleMap.find("")->second->Fill(matchedTau->mass());
-          puMediumvsEleMap.find("")->second->Fill(pvHandle->size());
-        }
-        // vsEle/loose
-        if (matchedTau->isTauIDAvailable("byLooseDeepTau2018v2p5VSe") &&
-            matchedTau->tauID("byLooseDeepTau2018v2p5VSe") >= 0.5) {
-          ptLoosevsEleMap.find("")->second->Fill(matchedTau->pt());
-          etaLoosevsEleMap.find("")->second->Fill(matchedTau->eta());
-          phiLoosevsEleMap.find("")->second->Fill(matchedTau->phi());
-          massLoosevsEleMap.find("")->second->Fill(matchedTau->mass());
-          puLoosevsEleMap.find("")->second->Fill(pvHandle->size());
-        }
-      }
-      // vsMuo/
-      if (extensionName_.compare(real_mudata) == 0 || extensionName_.compare(zmm) == 0 ||
-          extensionName_.compare(ztt) == 0) {
-        // vsMuo/tight
-        if (matchedTau->isTauIDAvailable("byTightDeepTau2018v2p5VSmu") &&
-            matchedTau->tauID("byTightDeepTau2018v2p5VSmu") >= 0.5) {
-          ptTightvsMuoMap.find("")->second->Fill(matchedTau->pt());
-          etaTightvsMuoMap.find("")->second->Fill(matchedTau->eta());
-          phiTightvsMuoMap.find("")->second->Fill(matchedTau->phi());
-          massTightvsMuoMap.find("")->second->Fill(matchedTau->mass());
-          puTightvsMuoMap.find("")->second->Fill(pvHandle->size());
-        }
-        // vsMuo/medium
-        if (matchedTau->isTauIDAvailable("byMediumDeepTau2018v2p5VSmu") &&
-            matchedTau->tauID("byMediumDeepTau2018v2p5VSmu") >= 0.5) {
-          ptMediumvsMuoMap.find("")->second->Fill(matchedTau->pt());
-          etaMediumvsMuoMap.find("")->second->Fill(matchedTau->eta());
-          phiMediumvsMuoMap.find("")->second->Fill(matchedTau->phi());
-          massMediumvsMuoMap.find("")->second->Fill(matchedTau->mass());
-          puMediumvsMuoMap.find("")->second->Fill(pvHandle->size());
-        }
-        // vsMuo/loose
-        if (matchedTau->isTauIDAvailable("byLooseDeepTau2018v2p5VSmu") &&
-            matchedTau->tauID("byLooseDeepTau2018v2p5VSmu") >= 0.5) {
-          ptLoosevsMuoMap.find("")->second->Fill(matchedTau->pt());
-          etaLoosevsMuoMap.find("")->second->Fill(matchedTau->eta());
-          phiLoosevsMuoMap.find("")->second->Fill(matchedTau->phi());
-          massLoosevsMuoMap.find("")->second->Fill(matchedTau->mass());
-          puLoosevsMuoMap.find("")->second->Fill(pvHandle->size());
-        }
-      }
     }
   }
 }

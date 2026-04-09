@@ -59,49 +59,64 @@ public:
   int findDecayMode(int Nc, int Np) { return 5 * (Nc - 1) + Np; };
 
 private:
-  edm::EDGetTokenT<std::vector<pat::Tau> > tauCollection_;
-  edm::EDGetTokenT<edm::View<reco::Candidate> > refCollectionInputTagToken_;
-  edm::EDGetTokenT<std::vector<reco::Vertex> > primaryVertexCollectionToken_;
-  edm::EDGetTokenT<std::vector<reco::GenParticle> > prunedGenToken_;
-  edm::EDGetTokenT<std::vector<reco::GenJet> > genJetsToken_;
+  edm::EDGetTokenT<std::vector<pat::Tau>> patTauToken_;
+  edm::EDGetTokenT<reco::PFTauCollection> pfTauToken_;
+  edm::EDGetTokenT<edm::View<reco::Candidate>> genRefToken_;
+  edm::EDGetTokenT<std::vector<reco::Vertex>> pvToken_;
+  edm::EDGetTokenT<std::vector<reco::GenParticle>> prunedGenToken_;
 
-  std::map<std::string, MonitorElement *> ptMap, etaMap, phiMap, massMap, puMap;
-  std::map<std::string, MonitorElement *> ptTightvsJetMap, phiTightvsJetMap, etaTightvsJetMap, massTightvsJetMap,
-      puTightvsJetMap;
-  std::map<std::string, MonitorElement *> ptTightvsEleMap, phiTightvsEleMap, etaTightvsEleMap, massTightvsEleMap,
-      puTightvsEleMap;
-  std::map<std::string, MonitorElement *> ptTightvsMuoMap, phiTightvsMuoMap, etaTightvsMuoMap, massTightvsMuoMap,
-      puTightvsMuoMap;
-  std::map<std::string, MonitorElement *> ptMediumvsJetMap, phiMediumvsJetMap, etaMediumvsJetMap, massMediumvsJetMap,
-      puMediumvsJetMap;
-  std::map<std::string, MonitorElement *> ptMediumvsEleMap, phiMediumvsEleMap, etaMediumvsEleMap, massMediumvsEleMap,
-      puMediumvsEleMap;
-  std::map<std::string, MonitorElement *> ptMediumvsMuoMap, phiMediumvsMuoMap, etaMediumvsMuoMap, massMediumvsMuoMap,
-      puMediumvsMuoMap;
-  std::map<std::string, MonitorElement *> ptLoosevsJetMap, phiLoosevsJetMap, etaLoosevsJetMap, massLoosevsJetMap,
-      puLoosevsJetMap;
-  std::map<std::string, MonitorElement *> ptLoosevsEleMap, phiLoosevsEleMap, etaLoosevsEleMap, massLoosevsEleMap,
-      puLoosevsEleMap;
-  std::map<std::string, MonitorElement *> ptLoosevsMuoMap, phiLoosevsMuoMap, etaLoosevsMuoMap, massLoosevsMuoMap,
-      puLoosevsMuoMap;
-  std::map<std::string, MonitorElement *> decayModeFindingMap, decayModeMap, byDeepTau2018v2p5VSerawMap,
-      byDeepTau2018v2p5VSjetrawMap, byDeepTau2018v2p5VSmurawMap, summaryMap;
-  std::map<std::string, MonitorElement *> mtau_dm0Map, mtau_dm1p2Map, mtau_dm5Map, mtau_dm6Map, mtau_dm10Map,
-      mtau_dm11Map;
-  std::map<std::string, MonitorElement *> dmMigrationMap, ntau_vs_dmMap;
-  std::map<std::string, MonitorElement *> pTOverProng_dm0Map, pTOverProng_dm1p2Map, pTOverProng_dm5Map,
-      pTOverProng_dm6Map, pTOverProng_dm10Map, pTOverProng_dm11Map;
+  const std::unordered_map<std::string, std::tuple<unsigned, float, float>> histoVars = {
+    {"pt", std::make_tuple(200, 0., 1000.)},
+    {"eta", std::make_tuple(60, -4.0, 4.0)},
+    {"phi", std::make_tuple(50, -3.5, 3.5)},
+    {"mass", std::make_tuple(200, 0, 10.)},
+    {"pu", std::make_tuple(100, 0., 100.)},
+  };
+
+  const std::vector<std::pair<std::vector<int>, std::string>> dm_list = {
+    {{0}, "dm0"},
+    {{1, 2}, "dm1p2"},
+    {{5}, "dm5"},
+    {{6}, "dm6"},
+    {{10}, "dm10"},
+    {{11}, "dm11"}
+  };
+
+  using UMap = std::unordered_map<std::string, MonitorElement*>;
+  UMap h_tausMatchedToRef_;
+  UMap h_tausMatchedToRef_TightvsJet;
+  UMap h_tausMatchedToRef_TightvsEle;
+  UMap h_tausMatchedToRef_TightvsMuo;
+  UMap h_tausMatchedToRef_MediumvsJet;
+  UMap h_tausMatchedToRef_MediumvsEle;
+  UMap h_tausMatchedToRef_MediumvsMuo;
+  UMap h_tausMatchedToRef_LoosevsJet;
+  UMap h_tausMatchedToRef_LoosevsEle;
+  UMap h_tausMatchedToRef_LoosevsMuo;
+
+  MonitorElement* DeepTau2018v2p5VSele;
+  MonitorElement* DeepTau2018v2p5VSjet;
+  MonitorElement* DeepTau2018v2p5VSmuo;
+  MonitorElement* decayModeFinding;
+  MonitorElement* decayModeTauReco;
+  MonitorElement* decayModeTauGen;
+  MonitorElement* dmMigration;
+  MonitorElement* nTau_vs_dm;
+
+  std::vector<MonitorElement*> h_pTOverProng_dm_;
+  std::vector<MonitorElement*> h_TauMass_dm_;
+
+  std::map<std::string, MonitorElement *> summaryMap;
+
   edm::ParameterSet histoSettings_;
   std::string extensionName_;
   std::vector<edm::ParameterSet> discriminators_;
-  std::vector<edm::ParameterSet> againstXs_;
-  std::string qcd;
-  std::string real_data;
-  std::string real_eledata;
-  std::string real_mudata;
-  std::string ztt;
-  std::string zee;
-  std::string zmm;
+
+  // Parameters
+  bool isMini;
+  bool isReco;
+  bool isHLT;
+  std::string TauType;
 };
 
 #endif

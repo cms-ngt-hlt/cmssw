@@ -4,7 +4,8 @@ from DQMServices.Core.DQMEDAnalyzer import DQMEDAnalyzer
 from Validation.RecoTau.dataTypes.ValidateTausOnZTT_cff import *
 
 tauValidationMiniAOD = DQMEDAnalyzer("TauValidationMiniAOD",
-  tauCollection = cms.InputTag("slimmedTaus"),
+  TauType = cms.string('mini'), # 'mini' for pat::TauCollection, 'reco' for reco::PFTauCollection
+  TauCollection = cms.InputTag("slimmedTaus"),
   RefCollection = cms.InputTag("kinematicSelectedTauValDenominatorZTT"),
   ExtensionName = cms.string('ZTT'),
   PVCollection  = cms.InputTag("offlineSlimmedPrimaryVertices"),
@@ -106,4 +107,5 @@ tauValidationMiniAOD = DQMEDAnalyzer("TauValidationMiniAOD",
     cms.PSet(discriminator = cms.string("byMediumDeepTau2018v2p5VSmu"),selectionCut = cms.double(0.5)),
     cms.PSet(discriminator = cms.string("byTightDeepTau2018v2p5VSmu"),selectionCut = cms.double(0.5)),
   ),
+  isHLT = cms.bool(False)
 )
