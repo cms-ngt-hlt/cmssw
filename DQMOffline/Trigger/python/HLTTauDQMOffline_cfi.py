@@ -77,7 +77,7 @@ kVital      = 1
 from DQMServices.Core.DQMEDAnalyzer import DQMEDAnalyzer
 hltTauOfflineMonitor_PFTaus = DQMEDAnalyzer('HLTTauDQMOfflineSource',
     HLTProcessName = cms.untracked.string(hltTauDQMofflineProcess),
-    DQMBaseFolder = cms.untracked.string("HLT/TAU/PFTaus"),
+    DQMBaseFolder = cms.untracked.string("HLT/Tau/PFTaus"),
     PlotLevel = cms.untracked.int32(kVital),
     TriggerResultsSrc = cms.untracked.InputTag("TriggerResults", "", hltTauDQMofflineProcess),
     TriggerEventSrc = cms.untracked.InputTag("hltTriggerSummaryAOD", "", hltTauDQMofflineProcess),
@@ -117,12 +117,12 @@ hltTauOfflineMonitor_PFTaus = DQMEDAnalyzer('HLTTauDQMOfflineSource',
 )
 
 hltTauOfflineMonitor_PNetTaus = hltTauOfflineMonitor_PFTaus.clone(
-    DQMBaseFolder = cms.untracked.string("HLT/TAU/PNetTaus"),
+    DQMBaseFolder = cms.untracked.string("HLT/Tau/PNetTaus"),
     Paths = cms.untracked.string("PNetTauh")
 )
 
 hltTauOfflineMonitor_Inclusive = hltTauOfflineMonitor_PFTaus.clone(
-    DQMBaseFolder = "HLT/TAU/Inclusive",
+    DQMBaseFolder = "HLT/Tau/Inclusive",
     Matching = cms.PSet(
         doMatching            = cms.untracked.bool(False),
         matchFilters          = cms.untracked.VPSet(),
@@ -143,7 +143,7 @@ def TriggerSelectionParameters(hltpaths):
 
 
 hltTauOfflineMonitor_TagAndProbe = hltTauOfflineMonitor_PFTaus.clone(
-    DQMBaseFolder = "HLT/TAU/TagAndProbe",
+    DQMBaseFolder = "HLT/Tau/TagAndProbe",
     Matching = cms.PSet(                                                                                                                                                                             
         doMatching            = cms.untracked.bool(True),                                                                                                                                            
         matchFilters          = cms.untracked.VPSet(                                                                                                                                                 

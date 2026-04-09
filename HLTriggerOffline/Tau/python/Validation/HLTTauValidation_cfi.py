@@ -5,7 +5,7 @@ hltTauValidationProcess_IDEAL = "HLT"
 from DQMServices.Core.DQMEDAnalyzer import DQMEDAnalyzer
 hltTauValIdealMonitorMC = DQMEDAnalyzer('HLTTauDQMOfflineSource',
     HLTProcessName = cms.untracked.string(hltTauValidationProcess_IDEAL),
-    DQMBaseFolder = cms.untracked.string("HLT/TAU/RelVal/MC"),
+    DQMBaseFolder = cms.untracked.string("HLT/Tau/RelVal/MC"),
     TriggerResultsSrc = cms.untracked.InputTag("TriggerResults", "", hltTauValidationProcess_IDEAL),
     TriggerEventSrc = cms.untracked.InputTag("hltTriggerSummaryAOD", "", hltTauValidationProcess_IDEAL),
     L1Plotter = cms.untracked.PSet(
@@ -42,7 +42,7 @@ hltTauValIdealMonitorMC = DQMEDAnalyzer('HLTTauDQMOfflineSource',
 )
 
 hltTauValIdealMonitorPF = hltTauValIdealMonitorMC.clone(
-    DQMBaseFolder = cms.untracked.string("HLT/TAU/RelVal/PF"),
+    DQMBaseFolder = cms.untracked.string("HLT/Tau/RelVal/PF"),
     Matching = cms.PSet(
         doMatching            = cms.untracked.bool(True),
         matchFilters          = cms.untracked.VPSet(
@@ -67,13 +67,13 @@ hltTauValIdealMonitorPF = hltTauValIdealMonitorMC.clone(
 )
 
 hltTauValIdealMonitorPNet = hltTauValIdealMonitorMC.clone(
-    DQMBaseFolder = cms.untracked.string("HLT/TAU/RelVal/PNet"),
+    DQMBaseFolder = cms.untracked.string("HLT/Tau/RelVal/PNet"),
     Paths = cms.untracked.string("PNetTau")
 )
 
 from DQMOffline.Trigger.HLTTauDQMOffline_cfi import hltTauOfflineMonitor_TagAndProbe
 hltTauValTagAndProbe = hltTauValIdealMonitorMC.clone(
-    DQMBaseFolder = cms.untracked.string("HLT/TAU/RelVal/TagAndProbe"),
+    DQMBaseFolder = cms.untracked.string("HLT/Tau/RelVal/TagAndProbe"),
     Matching = cms.PSet(
         doMatching            = cms.untracked.bool(True),
         matchFilters          = cms.untracked.VPSet(   
@@ -98,19 +98,17 @@ hltTauValTagAndProbe = hltTauValIdealMonitorMC.clone(
     TagAndProbe = hltTauOfflineMonitor_TagAndProbe.TagAndProbe
 )
 
-#hltTauValIdeal = cms.Sequence(hltTauValIdealMonitorMC+hltTauValIdealMonitorPF)
 hltTauValIdeal = cms.Sequence(hltTauValIdealMonitorMC+hltTauValIdealMonitorPF+hltTauValIdealMonitorPNet+hltTauValTagAndProbe)
 
-# Tau global validation 
-hltTauAnalyzer = DQMEDAnalyzer("TauValidationMiniAOD",
-  TauType = cms.string('reco'), # 'mini' for pat::TauCollection, 'reco' for reco::PFTauCollection
-  TauCollection = cms.InputTag("hltHpsPFTauProducer"),
-  RefCollection = cms.InputTag("kinematicSelectedTauValDenominatorQCD"),
-  ExtensionName = cms.string(""),
-  PVCollection  = cms.InputTag("offlineSlimmedPrimaryVertices"),
-  GenCollection = cms.InputTag("prunedGenParticles"),
-  discriminators = cms.VPSet(
-    cms.PSet(discriminator = cms.string("decayModeFinding"),selectionCut = cms.double(0.5)),
-  ),
-  isHLT = cms.bool(True),
+from Validation.RecoTau.TauValidationMiniAOD import TauValidationMiniAOD as _TauValidationMiniAOD
+
+hltTauAnalyzer = _TauValidationMiniAOD(
+  TauType = 'reco', # 'mini' for pat::TauCollection, 'reco' for reco::PFTauCollection
+  TauCollection = "hltHpsPFTauProducer",
+  RefCollection = "kinematicSelectedTauValDenominatorQCD",
+  PVCollection  = "hltOfflinePrimaryVertices",
+  GenCollection = "prunedGenParticles",
+  ExtensionName = "",
+  discriminators = cms.VPSet(),
+  isHLT = True,
 )
