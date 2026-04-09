@@ -1,15 +1,15 @@
 import FWCore.ParameterSet.Config as cms
 from DQMServices.Core.DQMEDAnalyzer import DQMEDAnalyzer
 
-from Validation.RecoTau.dataTypes.ValidateTausOnZTT_cff import *
+from Validation.RecoTau.TauValidationMiniAOD import TauValidationMiniAOD as _TauValidationMiniAOD
 
-tauValidationMiniAOD = DQMEDAnalyzer("TauValidationMiniAOD",
-  TauType = cms.string('mini'), # 'mini' for pat::TauCollection, 'reco' for reco::PFTauCollection
-  TauCollection = cms.InputTag("slimmedTaus"),
-  RefCollection = cms.InputTag("kinematicSelectedTauValDenominatorZTT"),
-  ExtensionName = cms.string('ZTT'),
-  PVCollection  = cms.InputTag("offlineSlimmedPrimaryVertices"),
-  GenCollection = cms.InputTag("prunedGenParticles"),
+tauValidationMiniAOD = _TauValidationMiniAOD(
+  TauType = "mini", # 'mini' for pat::TauCollection, 'reco' for reco::PFTauCollection
+  TauCollection = "slimmedTaus",
+  RefCollection = "kinematicSelectedTauValDenominatorZTT",
+  ExtensionName = "ZTT",
+  PVCollection  = "offlineSlimmedPrimaryVertices",
+  GenCollection = "prunedGenParticles",
   discriminators = cms.VPSet(
     cms.PSet(discriminator = cms.string("decayModeFinding"),selectionCut = cms.double(0.5)),
     cms.PSet(discriminator = cms.string("decayModeFindingNewDMs"),selectionCut = cms.double(0.5)),
@@ -107,5 +107,5 @@ tauValidationMiniAOD = DQMEDAnalyzer("TauValidationMiniAOD",
     cms.PSet(discriminator = cms.string("byMediumDeepTau2018v2p5VSmu"),selectionCut = cms.double(0.5)),
     cms.PSet(discriminator = cms.string("byTightDeepTau2018v2p5VSmu"),selectionCut = cms.double(0.5)),
   ),
-  isHLT = cms.bool(False)
+  isHLT = False
 )

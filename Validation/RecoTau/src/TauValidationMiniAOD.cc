@@ -1,26 +1,8 @@
-// -*- C++ -*-
-//
-// Package:    TauValidationMiniAOD
-// Class:      TauValidationMiniAOD
-//
-/**\class TauValidationMiniAOD TauValidationMiniAOD.cc
-
- Description: <one line class summary>
-
- Class used to do the Validation of the Tau in miniAOD
-
- Implementation:
- <Notes on implementation>
- */
-// Original Author:  Aniello Spiezia
-//         Created:  August 13, 2019
-// Updated By:       Ece Asilar
-//                   Gage DeZoort
-//       Date:       April 6th, 2020
-// Updated By:       Gourab Saha
-//       Date:       July 4th, 2023
-// Updated By:       Elena Vernazza
-//       Date:       April 9th, 2026
+// Class used to do the Validation of the Tau in miniAOD and reco/hlt
+// Created by Aniello Spiezia on August 13, 2019
+// Updated By Ece Asilar, Gage DeZoort on April 6th, 2020
+// Updated By Gourab Saha on July 4th, 2023
+// Updated By Elena Vernazza on April 9th, 2026
 
 #include "Validation/RecoTau/interface/TauValidationMiniAOD.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
@@ -55,10 +37,16 @@ TauValidationMiniAOD::TauValidationMiniAOD(const edm::ParameterSet &iConfig) {
   isHLT = iConfig.getParameter<bool>("isHLT");
 }
 
+//------------------------------------------------------------------------------
+// ~TauValidationMiniAOD
+//------------------------------------------------------------------------------
 TauValidationMiniAOD::~TauValidationMiniAOD() {}
 
+//------------------------------------------------------------------------------
+// bookHistograms
+//------------------------------------------------------------------------------
+
 void TauValidationMiniAOD::bookHistograms(DQMStore::IBooker &ibooker, edm::Run const &iRun, edm::EventSetup const &iSetup) {
-  MonitorElement *summaryTemp;
  
   std::string main_folder;
   if (isHLT) {
@@ -70,32 +58,6 @@ void TauValidationMiniAOD::bookHistograms(DQMStore::IBooker &ibooker, edm::Run c
   // ---------------------------- Book Summary Histograms -------------------------------
 
   ibooker.setCurrentFolder(main_folder + "/Summary");
-  histoInfo summaryHinfo = (histoSettings_.exists("summary"))
-                               ? histoInfo(histoSettings_.getParameter<edm::ParameterSet>("summary"))
-                               : histoInfo(15, -0.5, 14.5);
-
-  summaryTemp = ibooker.book1D(
-      "summaryPlotNum", "Summary Plot: Numerator", summaryHinfo.nbins, summaryHinfo.min, summaryHinfo.max);
-  summaryTemp->setYTitle("nTaus passing discriminants");
-  summaryMap.insert(std::make_pair("Num", summaryTemp));
-
-  summaryTemp = ibooker.book1D(
-      "summaryPlotDen", "Summary Plot: Denominator", summaryHinfo.nbins, summaryHinfo.min, summaryHinfo.max);
-  summaryTemp->setYTitle("nTaus passing discriminants");
-  summaryMap.insert(std::make_pair("Den", summaryTemp));
-
-  summaryTemp =
-      ibooker.book1D("summaryPlot", "Summary Plot: Efficiency", summaryHinfo.nbins, summaryHinfo.min, summaryHinfo.max);
-  summaryTemp->setYTitle("Efficiency of discriminants");
-  summaryMap.insert(std::make_pair("", summaryTemp));
-
-  // add discriminator labels to summary plots
-  for (uint j = 0; j < discriminators_.size(); j++) {
-    string DiscriminatorLabel = discriminators_[j].getParameter<string>("discriminator");
-    summaryMap.find("Den")->second->setBinLabel(j + 1, DiscriminatorLabel);
-    summaryMap.find("Num")->second->setBinLabel(j + 1, DiscriminatorLabel);
-    summaryMap.find("")->second->setBinLabel(j + 1, DiscriminatorLabel);
-  }
 
   // book histograms for taus matched to reference gen particle
   for (auto& hVar : histoVars) {
@@ -104,101 +66,112 @@ void TauValidationMiniAOD::bookHistograms(DQMStore::IBooker &ibooker, edm::Run c
   }
 
   // book deepTau and decay mode histograms
-  DeepTau2018v2p5VSele = ibooker.book1D("tau_byDeepTau2018v2p5VSeraw", ";DeepTau vs Ele", 200, 0., 1.);
-  DeepTau2018v2p5VSjet = ibooker.book1D("tau_byDeepTau2018v2p5VSjetraw", ";DeepTau vs Jet", 200, 0., 1.);
-  DeepTau2018v2p5VSmuo = ibooker.book1D("tau_byDeepTau2018v2p5VSmuraw", ";DeepTau vs Muo", 200, 0., 1.);
-  decayModeFinding = ibooker.book1D("tau_decayModeFinding", ";Decay Mode Finding", 2, -0.5, 1.5);
   decayModeTauReco = ibooker.book1D("tau_decayMode_reco", "Reco #tau;Decay Mode", 15, -0.5, 14.5);
   decayModeTauGen = ibooker.book1D("tau_decayMode_gen", "Gen #tau;Decay Mode", 15, -0.5, 14.5);
-
   dmMigration = ibooker.book2D("dmMigration", ";Gen #tau DM;Reco #tau DM", 15, -0.5, 14.5, 15, -0.5, 14.5);
   nTau_vs_dm = ibooker.book2D("ntau_vs_dm", ";nTau;#tau DM", 15, 0, 15, 15, 0, 15);
 
+  if (isMini) {
+    // book histograms for deepTau discriminators and decay mode finding
+    DeepTau2018v2p5VSele = ibooker.book1D("tau_byDeepTau2018v2p5VSeraw", ";DeepTau vs Ele", 200, 0., 1.);
+    DeepTau2018v2p5VSjet = ibooker.book1D("tau_byDeepTau2018v2p5VSjetraw", ";DeepTau vs Jet", 200, 0., 1.);
+    DeepTau2018v2p5VSmuo = ibooker.book1D("tau_byDeepTau2018v2p5VSmuraw", ";DeepTau vs Muo", 200, 0., 1.);
+    decayModeFinding = ibooker.book1D("tau_decayModeFinding", ";Decay Mode Finding", 2, -0.5, 1.5);
+    
+    // book summary histograms for discriminators
+    summary_num = ibooker.book1D("summaryPlotNum", "Summary Num", 15, -0.5, 14.5);
+    summary_den = ibooker.book1D("summaryPlotDen", "Summary Den", 15, -0.5, 14.5);
+    // add discriminator labels to summary plots
+    for (uint j = 0; j < discriminators_.size(); j++) {
+      string DiscriminatorLabel = discriminators_[j].getParameter<string>("discriminator");
+      summary_num->setBinLabel(j + 1, DiscriminatorLabel);
+      summary_den->setBinLabel(j + 1, DiscriminatorLabel);
+    }
+  }
+  
   // book histograms for tau pt and prong pt for different decay modes
-  h_pTOverProng_dm_.resize(dm_list.size());
   h_TauMass_dm_.resize(dm_list.size());
+  h_pTOverProng_dm_.resize(dm_list.size());
   std::string pT_Prong = "p_{T}^{#tau};p_{T} lead ch had";
   for (uint i = 0; i < dm_list.size(); i++) {
     const auto& [dm, label] = dm_list[i];;
-    h_pTOverProng_dm_[i] = ibooker.book2D("pTOverProng_" + label, "DM = " + label + ";" + pT_Prong, 50, 0, 1000, 50, 0, 1000);
     h_TauMass_dm_[i] = ibooker.book1D("mtau_" + label, "DM = " + label + ";m_{#tau}", 20, 0.0, 2.0);
+    if (isMini)
+      h_pTOverProng_dm_[i] = ibooker.book2D("pTOverProng_" + label, "DM = " + label + ";" + pT_Prong, 50, 0, 1000, 50, 0, 1000);
   }
 
-  // define some strings for comparison with extensionName
-  std::string qcd = "QCD";
-  std::string real_data = "RealData";
-  std::string real_eledata = "RealElectronsData";
-  std::string real_mudata = "RealMuonsData";
-  std::string ztt = "ZTT";
-  std::string zee = "ZEE";
-  std::string zmm = "ZMM";
+  if (isMini) {
+    // ---------------------------- /vsJet/ ---------------------------------------------
+    if (extensionName_.compare(qcd) == 0 || extensionName_.compare(real_data) == 0 || extensionName_.compare(ztt) == 0) {
 
-  // ---------------------------- /vsJet/ ---------------------------------------------
-  if (extensionName_.compare(qcd) == 0 || extensionName_.compare(real_data) == 0 || extensionName_.compare(ztt) == 0) {
+      ibooker.setCurrentFolder(main_folder + "/vsJet/tight");
+      for (auto& hVar : histoVars) {
+        auto [nBins, hMin, hMax] = hVar.second;
+        h_tausMatchedToRef_TightvsJet[hVar.first] = ibooker.book1D("tau_tightvsJet_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+      } 
 
-    ibooker.setCurrentFolder(main_folder + "/vsJet/tight");
-    for (auto& hVar : histoVars) {
-      auto [nBins, hMin, hMax] = hVar.second;
-      h_tausMatchedToRef_TightvsJet[hVar.first] = ibooker.book1D("tau_tightvsJet_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
-    } 
+      ibooker.setCurrentFolder(main_folder + "/vsJet/medium");
+      for (auto& hVar : histoVars) {
+        auto [nBins, hMin, hMax] = hVar.second;
+        h_tausMatchedToRef_MediumvsJet[hVar.first] = ibooker.book1D("tau_mediumvsJet_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+      } 
 
-    ibooker.setCurrentFolder(main_folder + "/vsJet/medium");
-    for (auto& hVar : histoVars) {
-      auto [nBins, hMin, hMax] = hVar.second;
-      h_tausMatchedToRef_MediumvsJet[hVar.first] = ibooker.book1D("tau_mediumvsJet_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
-    } 
-
-    ibooker.setCurrentFolder(main_folder + "/vsJet/loose");
-    for (auto& hVar : histoVars) {
-      auto [nBins, hMin, hMax] = hVar.second;
-      h_tausMatchedToRef_LoosevsJet[hVar.first] = ibooker.book1D("tau_loosevsJet_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
-    } 
-  }
-
-  // ---------------------------- /vsEle/ ---------------------------------------------
-  if (extensionName_.compare(real_eledata) == 0 || extensionName_.compare(zee) == 0 || extensionName_.compare(ztt) == 0) {
-
-    ibooker.setCurrentFolder(main_folder + "/vsEle/tight");
-    for (auto& hVar : histoVars) {
-      auto [nBins, hMin, hMax] = hVar.second;
-      h_tausMatchedToRef_TightvsEle[hVar.first] = ibooker.book1D("tau_tightvsEle_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+      ibooker.setCurrentFolder(main_folder + "/vsJet/loose");
+      for (auto& hVar : histoVars) {
+        auto [nBins, hMin, hMax] = hVar.second;
+        h_tausMatchedToRef_LoosevsJet[hVar.first] = ibooker.book1D("tau_loosevsJet_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+      } 
     }
 
-    ibooker.setCurrentFolder(main_folder + "/vsEle/medium");
-    for (auto& hVar : histoVars) {
-      auto [nBins, hMin, hMax] = hVar.second;
-      h_tausMatchedToRef_MediumvsEle[hVar.first] = ibooker.book1D("tau_mediumvsEle_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+    // ---------------------------- /vsEle/ ---------------------------------------------
+    if (extensionName_.compare(real_eledata) == 0 || extensionName_.compare(zee) == 0 || extensionName_.compare(ztt) == 0) {
+
+      ibooker.setCurrentFolder(main_folder + "/vsEle/tight");
+      for (auto& hVar : histoVars) {
+        auto [nBins, hMin, hMax] = hVar.second;
+        h_tausMatchedToRef_TightvsEle[hVar.first] = ibooker.book1D("tau_tightvsEle_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+      }
+
+      ibooker.setCurrentFolder(main_folder + "/vsEle/medium");
+      for (auto& hVar : histoVars) {
+        auto [nBins, hMin, hMax] = hVar.second;
+        h_tausMatchedToRef_MediumvsEle[hVar.first] = ibooker.book1D("tau_mediumvsEle_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+      }
+
+      ibooker.setCurrentFolder(main_folder + "/vsEle/loose");
+      for (auto& hVar : histoVars) {
+        auto [nBins, hMin, hMax] = hVar.second;
+        h_tausMatchedToRef_LoosevsEle[hVar.first] = ibooker.book1D("tau_loosevsEle_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+      }
     }
 
-    ibooker.setCurrentFolder(main_folder + "/vsEle/loose");
-    for (auto& hVar : histoVars) {
-      auto [nBins, hMin, hMax] = hVar.second;
-      h_tausMatchedToRef_LoosevsEle[hVar.first] = ibooker.book1D("tau_loosevsEle_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
-    }
-  }
+    // ---------------------------- /vsMuo/ ---------------------------------------------
+    if (extensionName_.compare(real_mudata) == 0 || extensionName_.compare(zmm) == 0 || extensionName_.compare(ztt) == 0) {
 
-  // ---------------------------- /vsMuo/ ---------------------------------------------
-  if (extensionName_.compare(real_mudata) == 0 || extensionName_.compare(zmm) == 0 || extensionName_.compare(ztt) == 0) {
+      ibooker.setCurrentFolder(main_folder + "/vsMuo/tight");
+      for (auto& hVar : histoVars) {
+        auto [nBins, hMin, hMax] = hVar.second;
+        h_tausMatchedToRef_TightvsMuo[hVar.first] = ibooker.book1D("tau_tightvsMuo_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+      }
 
-    ibooker.setCurrentFolder(main_folder + "/vsMuo/tight");
-    for (auto& hVar : histoVars) {
-      auto [nBins, hMin, hMax] = hVar.second;
-      h_tausMatchedToRef_TightvsMuo[hVar.first] = ibooker.book1D("tau_tightvsMuo_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
-    }
+      ibooker.setCurrentFolder(main_folder + "/vsMuo/medium");
+      for (auto& hVar : histoVars) {
+        auto [nBins, hMin, hMax] = hVar.second;
+        h_tausMatchedToRef_MediumvsMuo[hVar.first] = ibooker.book1D("tau_mediumvsMuo_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+      }
 
-    ibooker.setCurrentFolder(main_folder + "/vsMuo/medium");
-    for (auto& hVar : histoVars) {
-      auto [nBins, hMin, hMax] = hVar.second;
-      h_tausMatchedToRef_MediumvsMuo[hVar.first] = ibooker.book1D("tau_mediumvsMuo_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
-    }
-
-    ibooker.setCurrentFolder(main_folder + "/vsMuo/loose");
-    for (auto& hVar : histoVars) {
-      auto [nBins, hMin, hMax] = hVar.second;
-      h_tausMatchedToRef_LoosevsMuo[hVar.first] = ibooker.book1D("tau_loosevsMuo_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+      ibooker.setCurrentFolder(main_folder + "/vsMuo/loose");
+      for (auto& hVar : histoVars) {
+        auto [nBins, hMin, hMax] = hVar.second;
+        h_tausMatchedToRef_LoosevsMuo[hVar.first] = ibooker.book1D("tau_loosevsMuo_" + hVar.first, "#tau;" + hVar.first, nBins, hMin, hMax);
+      }
     }
   }
 }
+
+//------------------------------------------------------------------------------
+// analyze
+//------------------------------------------------------------------------------
 
 void TauValidationMiniAOD::analyze(const edm::Event &iEvent, const edm::EventSetup &iSetup) {
 
@@ -208,17 +181,15 @@ void TauValidationMiniAOD::analyze(const edm::Event &iEvent, const edm::EventSet
   if (isMini) {
     iEvent.getByToken(patTauToken_, patTaus);
     if (!patTaus.isValid()) {
-      edm::LogPrint("TauValidationMiniAOD") << " Pat Tau collection not found while running TauValidationMiniAOD.cc ";
+      edm::LogWarning("TauValidationMiniAOD") << " Pat Tau collection not found while running TauValidationMiniAOD.cc ";
       return;
     }
-    std::cout << "Pat Tau collection size: " << patTaus->size() << std::endl; // [DEBUG]
   } else if (isReco) {
     iEvent.getByToken(pfTauToken_, pfTaus);
     if (!pfTaus.isValid()) {
-      edm::LogPrint("TauValidationMiniAOD") << " Pf Tau collection not found while running TauValidationMiniAOD.cc ";
+      edm::LogWarning("TauValidationMiniAOD") << " Pf Tau collection not found while running TauValidationMiniAOD.cc ";
       return;
     }
-    std::cout << "Pf Tau collection size: " << pfTaus->size() << std::endl; // [DEBUG]
   }
 
   // create a handle to the reference collection
@@ -226,26 +197,23 @@ void TauValidationMiniAOD::analyze(const edm::Event &iEvent, const edm::EventSet
   edm::Handle<refCandidateCollection> genRefParticles;
   bool isRef = iEvent.getByToken(genRefToken_, genRefParticles);
   if (!isRef) {
-    edm::LogPrint("TauValidationMiniAOD") << " Reference collection not found while running TauValidationMiniAOD.cc ";
+    edm::LogWarning("TauValidationMiniAOD") << " Reference collection not found while running TauValidationMiniAOD.cc ";
     return;
   }
-  std::cout << "Reference collection " << extensionName_ << " size: " << genRefParticles->size() << std::endl; // [DEBUG]
 
   // create a handle to the gen Part collection
   edm::Handle<std::vector<reco::GenParticle>> genParticles;
   iEvent.getByToken(prunedGenToken_, genParticles);
   if (!genParticles.isValid()) {
-    edm::LogPrint("TauValidationMiniAOD") << " GenParticle collection not found while running TauValidationMiniAOD.cc ";
+    edm::LogWarning("TauValidationMiniAOD") << " GenParticle collection not found while running TauValidationMiniAOD.cc ";
   }
-  std::cout << "GenParticle collection size: " << genParticles->size() << std::endl; // [DEBUG]
 
   // create a handle to the primary vertex collection
   Handle<std::vector<reco::Vertex>> primaryVertices;
   bool isPV = iEvent.getByToken(pvToken_, primaryVertices);
   if (!isPV) {
-    edm::LogPrint("TauValidationMiniAOD") << " PV collection not found while running TauValidationMiniAOD.cc ";
+    edm::LogWarning("TauValidationMiniAOD") << " PV collection not found while running TauValidationMiniAOD.cc ";
   }
-  std::cout << "PV collection size: " << primaryVertices->size() << std::endl; // [DEBUG]
 
   float dR2min = 0.15;
   int matchedTauIndex = -99;
@@ -296,9 +264,6 @@ void TauValidationMiniAOD::analyze(const edm::Event &iEvent, const edm::EventSet
     }
 
     if (dR2min < 0.15) {
-      std::cout << "GenRef jet matched to tau index: " << matchedTauIndex << std::endl; // [DEBUG]
-      std::cout << "GenRef jet: " << genRef->pt() << ", " << genRef->eta() << ", " << genRef->phi() << std::endl; // [DEBUG]
-      std::cout << "Matched pt: " << tau_pt << ", " << tau_eta << ", " << tau_phi << std::endl; // [DEBUG]
 
       // fill kinematics with matched Tau quantities
       h_tausMatchedToRef_["pt"]->Fill(tau_pt);
@@ -391,10 +356,10 @@ void TauValidationMiniAOD::analyze(const edm::Event &iEvent, const edm::EventSet
         for (uint j = 0; j < discriminators_.size(); j++) {
           string currentDiscriminator = discriminators_[j].getParameter<string>("discriminator");
           double selectionCut = discriminators_[j].getParameter<double>("selectionCut");
-          summaryMap.find("Den")->second->Fill(j);
+          summary_den->Fill(j);
           if (matchedTau->isTauIDAvailable(currentDiscriminator) &&
               matchedTau->tauID(currentDiscriminator) >= selectionCut)
-            summaryMap.find("Num")->second->Fill(j);
+            summary_num->Fill(j);
         }
 
         // fill the discriminator histograms
@@ -494,4 +459,28 @@ void TauValidationMiniAOD::analyze(const edm::Event &iEvent, const edm::EventSet
 
     }
   }
+}
+
+//------------------------------------------------------------------------------
+// fill description
+//------------------------------------------------------------------------------
+
+void TauValidationMiniAOD::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+  edm::ParameterSetDescription desc;
+  // Default tau validation offline
+  desc.add<std::string>("TauType", "mini");
+  desc.add<edm::InputTag>("TauCollection", edm::InputTag("slimmedTaus"));
+  desc.add<edm::InputTag>("RefCollection", edm::InputTag("kinematicSelectedTauValDenominatorZTT"));
+  desc.add<edm::InputTag>("PVCollection", edm::InputTag("offlineSlimmedPrimaryVertices"));
+  desc.add<edm::InputTag>("GenCollection", edm::InputTag("prunedGenParticles"));
+  desc.add<std::string>("ExtensionName", "ZTT");
+  desc.add<bool>("isHLT", false);
+
+  edm::ParameterSetDescription discrDesc;
+  discrDesc.add<std::string>("discriminator");
+  discrDesc.add<double>("selectionCut");
+
+  desc.addVPSet("discriminators", discrDesc);
+  
+  descriptions.addWithDefaultLabel(desc);
 }

@@ -1,21 +1,6 @@
 #ifndef TauValidationMiniAOD_h
 #define TauValidationMiniAOD_h
 
-// -*- C++ -*-
-//
-// Package:    TauValidationMiniAOD
-// Class:      TauValidationMiniAOD
-//
-/* *\class TauValidationMiniAOD TauValidationMiniAOD.cc
-
- Description: EDAnalyzer to validate tau collection in miniAOD
- Implementation:
-
-*/
-// Original Author: Aniello Spiezia On August 13, 2019
-// Updated April, 2020 by Ece Asilar and Gage DeZoort
-// Updated July, 2023 by Gourab Saha
-
 // user include files
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
@@ -25,27 +10,13 @@
 #include "DataFormats/TauReco/interface/PFTau.h"
 #include "DataFormats/PatCandidates/interface/Tau.h"
 #include "DataFormats/Math/interface/deltaR.h"
+#include "FWCore/ParameterSet/interface/ParameterSetDescription.h"
+#include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
 
 // Include DQM core
 #include <DQMServices/Core/interface/DQMStore.h>
 #include <DQMServices/Core/interface/MonitorElement.h>
 #include <DQMServices/Core/interface/DQMEDAnalyzer.h>
-
-struct histoInfo {
-  int nbins;
-  double min;
-  double max;
-  histoInfo(int n, double m, double M) {
-    nbins = n;
-    min = m;
-    max = M;
-  }
-  histoInfo(const edm::ParameterSet &config) {
-    nbins = config.getParameter<int>("nbins");
-    min = config.getParameter<double>("min");
-    max = config.getParameter<double>("max");
-  }
-};
 
 // class declaration
 class TauValidationMiniAOD : public DQMEDAnalyzer {
@@ -54,6 +25,7 @@ public:
   ~TauValidationMiniAOD() override;
 
   void bookHistograms(DQMStore::IBooker &, edm::Run const &, edm::EventSetup const &) override;
+  static void fillDescriptions(edm::ConfigurationDescriptions &descriptions);
   void analyze(const edm::Event &iEvent, const edm::EventSetup &iSetup) override;
   // https://twiki.cern.ch/twiki/bin/viewauth/CMS/TauIDRecommendationForRun2#Decay_Mode_Reconstruction
   int findDecayMode(int Nc, int Np) { return 5 * (Nc - 1) + Np; };
@@ -82,6 +54,14 @@ private:
     {{11}, "dm11"}
   };
 
+  std::string qcd = "QCD";
+  std::string real_data = "RealData";
+  std::string real_eledata = "RealElectronsData";
+  std::string real_mudata = "RealMuonsData";
+  std::string ztt = "ZTT";
+  std::string zee = "ZEE";
+  std::string zmm = "ZMM";
+
   using UMap = std::unordered_map<std::string, MonitorElement*>;
   UMap h_tausMatchedToRef_;
   UMap h_tausMatchedToRef_TightvsJet;
@@ -98,21 +78,21 @@ private:
   MonitorElement* DeepTau2018v2p5VSjet;
   MonitorElement* DeepTau2018v2p5VSmuo;
   MonitorElement* decayModeFinding;
+
+  MonitorElement* summary_den;
+  MonitorElement* summary_num;
+
+  std::vector<MonitorElement*> h_pTOverProng_dm_;
+  std::vector<MonitorElement*> h_TauMass_dm_;
+
   MonitorElement* decayModeTauReco;
   MonitorElement* decayModeTauGen;
   MonitorElement* dmMigration;
   MonitorElement* nTau_vs_dm;
 
-  std::vector<MonitorElement*> h_pTOverProng_dm_;
-  std::vector<MonitorElement*> h_TauMass_dm_;
-
-  std::map<std::string, MonitorElement *> summaryMap;
-
-  edm::ParameterSet histoSettings_;
   std::string extensionName_;
   std::vector<edm::ParameterSet> discriminators_;
 
-  // Parameters
   bool isMini;
   bool isReco;
   bool isHLT;
