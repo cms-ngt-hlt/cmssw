@@ -47,8 +47,10 @@ private:
   using UMap = std::unordered_map<std::string, MonitorElement*>;
   UMap h_recoTau_;
   UMap h_recoTauMatched_;
+  UMap h_recoTauMultiMatched_;
   UMap h_genTau_;
   UMap h_genTauMatched_;
+  UMap h_genTauMultiMatched_;
 
   bool isHLT;
   float matchingDeltaR;

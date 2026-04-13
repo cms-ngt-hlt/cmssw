@@ -42,10 +42,12 @@ void TauValidationRECO::bookHistograms(DQMStore::IBooker& ibooker, edm::Run cons
   
   for (auto& hVar : histoVars) {
     auto [nBins, hMin, hMax] = hVar.second;
-    h_recoTau_[hVar.first] = ibooker.book1D("recoTau_" + hVar.first, "#tau^{reco};" + hVar.first, nBins, hMin, hMax);
-    h_recoTauMatched_[hVar.first] = ibooker.book1D("recoTauMatched_" + hVar.first, "#tau^{reco} (Matched);" + hVar.first, nBins, hMin, hMax);
+    h_recoTau_[hVar.first] = ibooker.book1D("recoTau_" + hVar.first, ";#tau^{reco};" + hVar.first, nBins, hMin, hMax);
+    h_recoTauMatched_[hVar.first] = ibooker.book1D("recoTauMatched_" + hVar.first, ";#tau^{reco} (Matched);" + hVar.first, nBins, hMin, hMax);
+    h_recoTauMultiMatched_[hVar.first] = ibooker.book1D("recoTauMultiMatched_" + hVar.first, ";#tau^{reco} (Multi-Matched);" + hVar.first, nBins, hMin, hMax);
     h_genTau_[hVar.first] = ibooker.book1D("genTau_" + hVar.first, "#tau^{gen};" + hVar.first, nBins, hMin, hMax);
-    h_genTauMatched_[hVar.first] = ibooker.book1D("genTauMatched_" + hVar.first, "#tau^{gen} (Matched);" + hVar.first, nBins, hMin, hMax);
+    h_genTauMatched_[hVar.first] = ibooker.book1D("genTauMatched_" + hVar.first, ";#tau^{gen} (Matched);" + hVar.first, nBins, hMin, hMax);
+    h_genTauMultiMatched_[hVar.first] = ibooker.book1D("genTauMultiMatched_" + hVar.first, ";#tau^{gen} (Multi-Matched);" + hVar.first, nBins, hMin, hMax);
   }
 
 }
@@ -66,7 +68,7 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
     edm::LogPrint("TauValidationRECO") << " Reco Tau collection not found while running TauValidationRECO.cc ";
     return;
   }
-  std::cout << "Number of reco taus: " << recoTaus->size() << std::endl; // [DEBUG]
+  // std::cout << "Number of reco taus: " << recoTaus->size() << std::endl; // [DEBUG]
 
   edm::Handle<reco::GenJetCollection> genTaus;
   mEvent.getByToken(genTauToken_, genTaus);
@@ -74,7 +76,7 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
     edm::LogPrint("TauValidationRECO") << " Gen Tau collection not found while running TauValidationRECO.cc ";
     return;
   }
-  std::cout << "Number of gen taus: " << genTaus->size() << std::endl; // [DEBUG]
+  // std::cout << "Number of gen taus: " << genTaus->size() << std::endl; // [DEBUG]
 
   // Loop for efficiency 
   for (uint itau = 0; itau < genTaus->size(); ++itau) {
@@ -102,6 +104,12 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
       h_genTauMatched_["eta"]->Fill(genTaus->at(itau).eta());
       h_genTauMatched_["phi"]->Fill(genTaus->at(itau).phi());
       h_genTauMatched_["mass"]->Fill(genTaus->at(itau).mass());
+      if (nRecoMatchedToOneGen > 1) {
+        h_genTauMultiMatched_["pt"]->Fill(genTaus->at(itau).pt());
+        h_genTauMultiMatched_["eta"]->Fill(genTaus->at(itau).eta());
+        h_genTauMultiMatched_["phi"]->Fill(genTaus->at(itau).phi());
+        h_genTauMultiMatched_["mass"]->Fill(genTaus->at(itau).mass());
+      }
     }
   }
 
@@ -125,6 +133,12 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
         h_recoTauMatched_["eta"]->Fill(recoTaus->at(itau).eta());
         h_recoTauMatched_["phi"]->Fill(recoTaus->at(itau).phi());
         h_recoTauMatched_["mass"]->Fill(recoTaus->at(itau).mass());
+        if (nGenMatchedToOneReco > 1) {
+          h_recoTauMultiMatched_["pt"]->Fill(recoTaus->at(itau).pt());
+          h_recoTauMultiMatched_["eta"]->Fill(recoTaus->at(itau).eta());
+          h_recoTauMultiMatched_["phi"]->Fill(recoTaus->at(itau).phi());
+          h_recoTauMultiMatched_["mass"]->Fill(recoTaus->at(itau).mass());
+        }
       }
     }
   }
