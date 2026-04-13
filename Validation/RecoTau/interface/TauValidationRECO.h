@@ -54,6 +54,7 @@ private:
 
   bool isHLT;
   float matchingDeltaR;
+  std::string outFolder_;
   std::vector<std::string> decayModes;
 
 };
