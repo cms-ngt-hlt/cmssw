@@ -16,6 +16,7 @@ TauValidation::TauValidation(const edm::ParameterSet& iConfig) {
   genTauToken_ = consumes<reco::GenJetCollection>(iConfig.getParameter<edm::InputTag>("genTauCollection"));
   decayModes = iConfig.getParameter<std::vector<std::string>>("decayModes");
   matchingDeltaR = iConfig.getParameter<double>("minDeltaR");
+  outFolder_ = iConfig.getParameter<std::string>("outFolder");
   isHLT = iConfig.getUntrackedParameter<bool>("isHLT");
 }
 
@@ -34,11 +35,7 @@ bool TauValidation::isSelectedDecayMode(const reco::GenJet& genTau, const std::v
 void TauValidation::bookHistograms(DQMStore::IBooker& ibooker, edm::Run const& iRun, edm::EventSetup const&) {
 
   // ---------------------------- Book Summary Histograms -------------------------------
-  if (isHLT) {
-    ibooker.setCurrentFolder("HLT/Tau/TauValidation");
-  } else {
-    ibooker.setCurrentFolder("Tau/TauValidation");
-  }
+  ibooker.setCurrentFolder(outFolder_);
   
   for (auto& hVar : histoVars) {
     auto [nBins, hMin, hMax] = hVar.second;
@@ -155,6 +152,7 @@ void TauValidation::fillDescriptions(edm::ConfigurationDescriptions& description
   desc.add<edm::InputTag>("genTauCollection", edm::InputTag("tauGenJets"));
   desc.add<std::vector<std::string>>("decayModes", {"oneProng0Pi0", "oneProng1Pi0", "oneProng2Pi0", "oneProngOther", "threeProng0Pi0", "threeProng1Pi0", "threeProngOther", "rare"});
   desc.add<double>("minDeltaR", 0.3);
+  desc.add<std::string>("outFolder", "HLT/Tau/TauValidation");
   desc.addUntracked<bool>("isHLT", true);
   descriptions.addWithDefaultLabel(desc);
 }
