@@ -100,11 +100,3 @@ hltTauValTagAndProbe = hltTauValIdealMonitorMC.clone(
 
 #hltTauValIdeal = cms.Sequence(hltTauValIdealMonitorMC+hltTauValIdealMonitorPF)
 hltTauValIdeal = cms.Sequence(hltTauValIdealMonitorMC+hltTauValIdealMonitorPF+hltTauValIdealMonitorPNet+hltTauValTagAndProbe)
-
-from Validation.RecoTau.TauValidationRECO import TauValidationRECO as _TauValidationRECO
-hltTauValidation = _TauValidationRECO(
-    recoTauCollection = "hltHpsPFTauProducer",
-    genTauCollection = "tauGenJets",
-    decayModes = cms.vstring('oneProng0Pi0', 'oneProng1Pi0', 'oneProng2Pi0', 'oneProngOther', 'threeProng0Pi0', 'threeProng1Pi0', 'threeProngOther', 'rare'),
-    isHLT = True
-)
