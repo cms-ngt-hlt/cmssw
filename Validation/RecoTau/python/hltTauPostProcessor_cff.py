@@ -2,7 +2,7 @@ import FWCore.ParameterSet.Config as cms
 from DQMServices.Core.DQMEDHarvester import DQMEDHarvester
 
 hltTauPostProcessor = DQMEDHarvester("DQMGenericClient",
-    subDirs=cms.untracked.vstring("HLT/Tau/TauValidation"),
+    subDirs=cms.untracked.vstring("HLT/Tau/TauValidation/*"),
     efficiency = cms.vstring(),
     efficiencyProfile = cms.untracked.vstring( # for smoother rebinning
         # Efficiency
