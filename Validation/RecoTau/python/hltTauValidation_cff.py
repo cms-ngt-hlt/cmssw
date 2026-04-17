@@ -4,7 +4,7 @@ from Validation.RecoTau.TauValidationRECO import TauValidationRECO as _TauValida
 
 hltTauValidation = _TauValidationRECO(
     recoTauCollection = "hltHpsPFTauProducer",
-    genTauCollection = "tauGenJets",
+    genTauCollection = "tauGenJetsSelectorAllHadrons",
     minDeltaR = 0.3,
     outFolder = "HLT/Tau/TauValidation/DeltaR0p3",
     isHLT = True

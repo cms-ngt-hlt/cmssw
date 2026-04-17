@@ -30,8 +30,6 @@ public:
   void bookHistograms(DQMStore::IBooker &, edm::Run const &, edm::EventSetup const &) override;
   static void fillDescriptions(edm::ConfigurationDescriptions &descriptions);
 
-  bool isSelectedDecayMode(const reco::GenJet &genTau, const std::vector<std::string> &decayModes) const;
-
 private:
 
   edm::EDGetTokenT<reco::PFTauCollection> recoTauToken_;
@@ -55,7 +53,6 @@ private:
   bool isHLT;
   float matchingDeltaR;
   std::string outFolder_;
-  std::vector<std::string> decayModes;
 
 };
 

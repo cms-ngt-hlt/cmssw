@@ -14,23 +14,10 @@ using namespace std;
 TauValidationRECO::TauValidationRECO(const edm::ParameterSet& iConfig) {
   recoTauToken_ = consumes<reco::PFTauCollection>(iConfig.getParameter<edm::InputTag>("recoTauCollection"));
   genTauToken_ = consumes<reco::GenJetCollection>(iConfig.getParameter<edm::InputTag>("genTauCollection"));
-  decayModes = iConfig.getParameter<std::vector<std::string>>("decayModes");
   matchingDeltaR = iConfig.getParameter<double>("minDeltaR");
   outFolder_ = iConfig.getParameter<std::string>("outFolder");
   isHLT = iConfig.getUntrackedParameter<bool>("isHLT");
 }
-
-bool TauValidationRECO::isSelectedDecayMode(const reco::GenJet& genTau, const std::vector<std::string>& decayModes) const {
-  std::string tauGenJetDecayMode = JetMCTagUtils::genTauDecayMode(genTau);
-  for (std::vector<std::string>::const_iterator i_dm = decayModes.begin(); i_dm != decayModes.end(); ++i_dm) {
-    if (tauGenJetDecayMode == (*i_dm)) {
-      // edm::LogPrint("TauValidationRECO") << "Selected gen tau decay mode: " << tauGenJetDecayMode;
-      return true;
-    }
-  }
-  return false;
-}
-
 
 void TauValidationRECO::bookHistograms(DQMStore::IBooker& ibooker, edm::Run const& iRun, edm::EventSetup const&) {
 
@@ -77,10 +64,6 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
 
   // Loop for efficiency 
   for (uint itau = 0; itau < genTaus->size(); ++itau) {
-
-    if (!isSelectedDecayMode(genTaus->at(itau), decayModes)){
-      continue;
-    }
     
     h_genTau_["pt"]->Fill(genTaus->at(itau).pt());
     h_genTau_["eta"]->Fill(genTaus->at(itau).eta());
@@ -150,7 +133,6 @@ void TauValidationRECO::fillDescriptions(edm::ConfigurationDescriptions& descrip
   // Default tau validation HLT
   desc.add<edm::InputTag>("recoTauCollection", edm::InputTag("hltHpsPFTauProducer"));
   desc.add<edm::InputTag>("genTauCollection", edm::InputTag("tauGenJets"));
-  desc.add<std::vector<std::string>>("decayModes", {"oneProng0Pi0", "oneProng1Pi0", "oneProng2Pi0", "oneProngOther", "threeProng0Pi0", "threeProng1Pi0", "threeProngOther", "rare"});
   desc.add<double>("minDeltaR", 0.3);
   desc.add<std::string>("outFolder", "HLT/Tau/TauValidation");
   desc.addUntracked<bool>("isHLT", true);
