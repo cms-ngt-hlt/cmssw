@@ -106,19 +106,19 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
       if (deltaR(genTaus->at(jtau), recoTaus->at(itau)) < matchingDeltaR) {
         nGenMatchedToOneReco++;
       }
+    }
 
     // Fill histograms for reco taus matched to at least one gen tau
-      if (nGenMatchedToOneReco > 0) {
-        h_recoTauMatched_["pt"]->Fill(recoTaus->at(itau).pt());
-        h_recoTauMatched_["eta"]->Fill(recoTaus->at(itau).eta());
-        h_recoTauMatched_["phi"]->Fill(recoTaus->at(itau).phi());
-        h_recoTauMatched_["mass"]->Fill(recoTaus->at(itau).mass());
-        if (nGenMatchedToOneReco > 1) {
-          h_recoTauMultiMatched_["pt"]->Fill(recoTaus->at(itau).pt());
-          h_recoTauMultiMatched_["eta"]->Fill(recoTaus->at(itau).eta());
-          h_recoTauMultiMatched_["phi"]->Fill(recoTaus->at(itau).phi());
-          h_recoTauMultiMatched_["mass"]->Fill(recoTaus->at(itau).mass());
-        }
+    if (nGenMatchedToOneReco > 0) {
+      h_recoTauMatched_["pt"]->Fill(recoTaus->at(itau).pt());
+      h_recoTauMatched_["eta"]->Fill(recoTaus->at(itau).eta());
+      h_recoTauMatched_["phi"]->Fill(recoTaus->at(itau).phi());
+      h_recoTauMatched_["mass"]->Fill(recoTaus->at(itau).mass());
+      if (nGenMatchedToOneReco > 1) {
+        h_recoTauMultiMatched_["pt"]->Fill(recoTaus->at(itau).pt());
+        h_recoTauMultiMatched_["eta"]->Fill(recoTaus->at(itau).eta());
+        h_recoTauMultiMatched_["phi"]->Fill(recoTaus->at(itau).phi());
+        h_recoTauMultiMatched_["mass"]->Fill(recoTaus->at(itau).mass());
       }
     }
   }
