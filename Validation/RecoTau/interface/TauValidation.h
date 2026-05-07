@@ -42,6 +42,15 @@ private:
     {"mass", std::make_tuple(200, 0, 10.)},
   };
 
+  const std::unordered_map<std::string, std::tuple<unsigned, float, float, unsigned, float, float>> histoVars2D = {
+    {"pt_eta", std::make_tuple(200, 0., 1000., 60, -4.0, 4.0)},
+    {"pt_phi", std::make_tuple(200, 0., 1000., 50, -3.5, 3.5)},
+    {"pt_mass", std::make_tuple(200, 0., 1000., 200, 0., 10.)},
+    {"mass_eta", std::make_tuple(200, 0., 10., 60, -4.0, 4.0)},
+    {"mass_phi", std::make_tuple(200, 0., 10., 50, -3.5, 3.5)},
+  };
+
+
   using UMap = std::unordered_map<std::string, MonitorElement*>;
   UMap h_recoTau_;
   UMap h_recoTauMatched_;
@@ -49,6 +58,14 @@ private:
   UMap h_genTau_;
   UMap h_genTauMatched_;
   UMap h_genTauMultiMatched_;
+  UMap h2d_recoTau_;
+  UMap h2d_recoTauMatched_;
+  UMap h2d_recoTauMultiMatched_;
+  UMap h2d_genTau_;
+  UMap h2d_genTauMatched_;
+  UMap h2d_genTauMultiMatched_;
+  UMap h2d_responsePt_;
+  UMap h2d_responseMass_;
 
   bool isHLT;
   float matchingDeltaR;

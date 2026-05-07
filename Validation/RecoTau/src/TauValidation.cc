@@ -32,6 +32,20 @@ void TauValidation::bookHistograms(DQMStore::IBooker& ibooker, edm::Run const& i
     h_genTau_[hVar.first] = ibooker.book1D("genTau_" + hVar.first, "#tau^{gen};" + hVar.first, nBins, hMin, hMax);
     h_genTauMatched_[hVar.first] = ibooker.book1D("genTauMatched_" + hVar.first, ";#tau^{gen} (Matched);" + hVar.first, nBins, hMin, hMax);
     h_genTauMultiMatched_[hVar.first] = ibooker.book1D("genTauMultiMatched_" + hVar.first, ";#tau^{gen} (Multi-Matched);" + hVar.first, nBins, hMin, hMax);
+    h2d_responsePt_[hVar.first] = ibooker.book2D("responsePt_" + hVar.first, ";#tau Pt Response;" + hVar.first, nBins, hMin, hMax, 50, 0., 2.);
+    h2d_responseMass_[hVar.first] = ibooker.book2D("responseMass_" + hVar.first, ";#tau Mass Response;" + hVar.first, nBins, hMin, hMax, 50, 0., 2.);
+  }
+
+  for (auto& h2dVar : histoVars2D) {
+    auto [nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY] = h2dVar.second;
+    auto x_title = h2dVar.first.substr(0, h2dVar.first.find("_"));
+    auto y_title = h2dVar.first.substr(h2dVar.first.find("_") + 1);
+    h2d_recoTau_[h2dVar.first] = ibooker.book2D("recoTau_" + h2dVar.first, ";#tau^{reco}" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
+    h2d_recoTauMatched_[h2dVar.first] = ibooker.book2D("recoTauMatched_" + h2dVar.first, ";#tau^{reco} (Matched);" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
+    h2d_recoTauMultiMatched_[h2dVar.first] = ibooker.book2D("recoTauMultiMatched_" + h2dVar.first, ";#tau^{reco} (Multi-Matched);" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
+    h2d_genTau_[h2dVar.first] = ibooker.book2D("genTau_" + h2dVar.first, ";#tau^{gen}" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
+    h2d_genTauMatched_[h2dVar.first] = ibooker.book2D("genTauMatched_" + h2dVar.first, ";#tau^{gen} (Matched);" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
+    h2d_genTauMultiMatched_[h2dVar.first] = ibooker.book2D("genTauMultiMatched_" + h2dVar.first, ";#tau^{gen} (Multi-Matched);" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
   }
 
 }
@@ -69,26 +83,62 @@ void TauValidation::analyze(const edm::Event& mEvent, const edm::EventSetup& mSe
     h_genTau_["eta"]->Fill(genTaus->at(itau).eta());
     h_genTau_["phi"]->Fill(genTaus->at(itau).phi());
     h_genTau_["mass"]->Fill(genTaus->at(itau).mass());
-    
+    h2d_genTau_["pt_eta"]->Fill(genTaus->at(itau).pt(), genTaus->at(itau).eta());
+    h2d_genTau_["pt_phi"]->Fill(genTaus->at(itau).pt(), genTaus->at(itau).phi());
+    h2d_genTau_["pt_mass"]->Fill(genTaus->at(itau).pt(), genTaus->at(itau).mass());
+    h2d_genTau_["mass_eta"]->Fill(genTaus->at(itau).mass(), genTaus->at(itau).eta());
+    h2d_genTau_["mass_phi"]->Fill(genTaus->at(itau).mass(), genTaus->at(itau).phi());
+
     // Count how many reco taus are matched to the gen tau
     int nRecoMatchedToOneGen = 0;
+    float bestDeltaR = 999.;
+    float ResponsePt_bestDeltaR = 0.;
+    float ResponseMass_bestDeltaR = 0.;
     for (uint jtau = 0; jtau < recoTaus->size(); ++jtau) {
-      if (deltaR(genTaus->at(itau), recoTaus->at(jtau)) < matchingDeltaR) {
+      float deltaRValue = deltaR(genTaus->at(itau), recoTaus->at(jtau));
+      if (deltaRValue < matchingDeltaR) {
         nRecoMatchedToOneGen++;
+        if (deltaRValue < bestDeltaR) {
+          bestDeltaR = deltaRValue;
+          ResponsePt_bestDeltaR = recoTaus->at(jtau).pt() / genTaus->at(itau).pt();
+          ResponseMass_bestDeltaR = recoTaus->at(jtau).mass() / genTaus->at(itau).mass();
+        }
       }
     }
 
     // Fill histograms for gen taus matched to at least one reco tau
     if (nRecoMatchedToOneGen > 0) {
+      // Fill gen tau histograms for matched taus
       h_genTauMatched_["pt"]->Fill(genTaus->at(itau).pt());
       h_genTauMatched_["eta"]->Fill(genTaus->at(itau).eta());
       h_genTauMatched_["phi"]->Fill(genTaus->at(itau).phi());
       h_genTauMatched_["mass"]->Fill(genTaus->at(itau).mass());
+      h2d_genTauMatched_["pt_eta"]->Fill(genTaus->at(itau).pt(), genTaus->at(itau).eta());
+      h2d_genTauMatched_["pt_phi"]->Fill(genTaus->at(itau).pt(), genTaus->at(itau).phi());
+      h2d_genTauMatched_["pt_mass"]->Fill(genTaus->at(itau).pt(), genTaus->at(itau).mass());
+      h2d_genTauMatched_["mass_eta"]->Fill(genTaus->at(itau).mass(), genTaus->at(itau).eta());
+      h2d_genTauMatched_["mass_phi"]->Fill(genTaus->at(itau).mass(), genTaus->at(itau).phi());
+      // Fill response histograms for matched taus
+      h2d_responsePt_["pt"]->Fill(genTaus->at(itau).pt(), ResponsePt_bestDeltaR);
+      h2d_responsePt_["eta"]->Fill(genTaus->at(itau).eta(), ResponsePt_bestDeltaR);
+      h2d_responsePt_["phi"]->Fill(genTaus->at(itau).phi(), ResponsePt_bestDeltaR);
+      h2d_responsePt_["mass"]->Fill(genTaus->at(itau).mass(), ResponsePt_bestDeltaR);
+      h2d_responseMass_["pt"]->Fill(genTaus->at(itau).pt(), ResponseMass_bestDeltaR);
+      h2d_responseMass_["eta"]->Fill(genTaus->at(itau).eta(), ResponseMass_bestDeltaR);
+      h2d_responseMass_["phi"]->Fill(genTaus->at(itau).phi(), ResponseMass_bestDeltaR);
+      h2d_responseMass_["mass"]->Fill(genTaus->at(itau).mass(), ResponseMass_bestDeltaR);
+
       if (nRecoMatchedToOneGen > 1) {
+        // Fill gen tau histograms for multi-matched taus
         h_genTauMultiMatched_["pt"]->Fill(genTaus->at(itau).pt());
         h_genTauMultiMatched_["eta"]->Fill(genTaus->at(itau).eta());
         h_genTauMultiMatched_["phi"]->Fill(genTaus->at(itau).phi());
         h_genTauMultiMatched_["mass"]->Fill(genTaus->at(itau).mass());
+        h2d_genTauMultiMatched_["pt_eta"]->Fill(genTaus->at(itau).pt(), genTaus->at(itau).eta());
+        h2d_genTauMultiMatched_["pt_phi"]->Fill(genTaus->at(itau).pt(), genTaus->at(itau).phi());
+        h2d_genTauMultiMatched_["pt_mass"]->Fill(genTaus->at(itau).pt(), genTaus->at(itau).mass());
+        h2d_genTauMultiMatched_["mass_eta"]->Fill(genTaus->at(itau).mass(), genTaus->at(itau).eta());
+        h2d_genTauMultiMatched_["mass_phi"]->Fill(genTaus->at(itau).mass(), genTaus->at(itau).phi());
       }
     }
   }
@@ -99,6 +149,11 @@ void TauValidation::analyze(const edm::Event& mEvent, const edm::EventSetup& mSe
     h_recoTau_["eta"]->Fill(recoTaus->at(itau).eta());
     h_recoTau_["phi"]->Fill(recoTaus->at(itau).phi());
     h_recoTau_["mass"]->Fill(recoTaus->at(itau).mass());
+    h2d_recoTau_["pt_eta"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).eta());
+    h2d_recoTau_["pt_phi"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).phi());
+    h2d_recoTau_["pt_mass"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).mass());
+    h2d_recoTau_["mass_eta"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).eta());
+    h2d_recoTau_["mass_phi"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).phi());
 
     // Count how many gen taus are matched to the reco tau
     int nGenMatchedToOneReco = 0;
@@ -110,15 +165,27 @@ void TauValidation::analyze(const edm::Event& mEvent, const edm::EventSetup& mSe
 
     // Fill histograms for reco taus matched to at least one gen tau
     if (nGenMatchedToOneReco > 0) {
+      // Fill reco tau histograms for matched taus
       h_recoTauMatched_["pt"]->Fill(recoTaus->at(itau).pt());
       h_recoTauMatched_["eta"]->Fill(recoTaus->at(itau).eta());
       h_recoTauMatched_["phi"]->Fill(recoTaus->at(itau).phi());
       h_recoTauMatched_["mass"]->Fill(recoTaus->at(itau).mass());
+      h2d_recoTauMatched_["pt_eta"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).eta());
+      h2d_recoTauMatched_["pt_phi"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).phi());
+      h2d_recoTauMatched_["pt_mass"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).mass());
+      h2d_recoTauMatched_["mass_eta"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).eta());
+      h2d_recoTauMatched_["mass_phi"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).phi());
       if (nGenMatchedToOneReco > 1) {
+        // Fill reco tau histograms for multi-matched taus
         h_recoTauMultiMatched_["pt"]->Fill(recoTaus->at(itau).pt());
         h_recoTauMultiMatched_["eta"]->Fill(recoTaus->at(itau).eta());
         h_recoTauMultiMatched_["phi"]->Fill(recoTaus->at(itau).phi());
         h_recoTauMultiMatched_["mass"]->Fill(recoTaus->at(itau).mass());
+        h2d_recoTauMultiMatched_["pt_eta"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).eta());
+        h2d_recoTauMultiMatched_["pt_phi"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).phi());
+        h2d_recoTauMultiMatched_["pt_mass"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).mass());
+        h2d_recoTauMultiMatched_["mass_eta"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).eta());
+        h2d_recoTauMultiMatched_["mass_phi"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).phi());
       }
     }
   }
