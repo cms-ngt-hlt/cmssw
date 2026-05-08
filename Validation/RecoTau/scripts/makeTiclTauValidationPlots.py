@@ -977,7 +977,7 @@ def main():
     args = parser.parse_args()
 
     if args.step == 'HLT':
-        dqm_dir = "DQMData/Run 1/HLT/Run summary/TICL/ticlTauValidator"
+        dqm_dir = "DQMData/Run 1/HLT/Run summary/TAU/ticlTauValidator"
     elif args.step == 'Offline':
         dqm_dir = "DQMData/Run 1/Run summary/RecoTauV/ticlTauValidator/"
     else:

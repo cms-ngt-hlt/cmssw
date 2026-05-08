@@ -8,7 +8,7 @@ recoTiclTauValidator = _ticlTauValidator.clone(
 
 # HLT
 hltTiclTauValidator = _ticlTauValidator.clone(
-    folder = cms.string("HLT/TICL/ticlTauValidator"),
+    folder = cms.string("HLT/TAU/ticlTauValidator"),
     simTaus     = cms.InputTag("SimTauProducer"),
     TauProducer = cms.InputTag("hltHpsPFTauProducer"),
     pf          = cms.InputTag("hltParticleFlowTmp"),
