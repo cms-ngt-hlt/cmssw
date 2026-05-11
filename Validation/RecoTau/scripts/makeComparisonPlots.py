@@ -545,6 +545,7 @@ if __name__ == '__main__':
     parser.add_argument('--ylabel', type=str, default=None, required=False,                   help='Custom y-axis label.')
     parser.add_argument('--cms-text', type=str, default="Preliminary", required=False,        help='CMS label text.')
     parser.add_argument('--energy-text', type=str, default=None, required=False,              help='Custom energy text for CMS label.')
+    parser.add_argument('--inverted', action='store_true',                                    help='Invert histograms. E.g. Purity --> Fake Rates.')
     args = parser.parse_args()
 
     file_paths = [f.strip() for f in args.files.split(',')]
@@ -593,7 +594,27 @@ if __name__ == '__main__':
                 raise ValueError(f"Unknown type for rebin: {type(rebin)}")
         
         hist_clone.SetDirectory(0)
-        
+
+        # Keep empty bins, to understand if the purity is really 0 or you just don't have entries.
+        empty_bins = [
+            hist_clone.GetBinEntries(ibin) == 0
+            for ibin in range(1, hist_clone.GetNbinsX() + 1)
+        ]
+
+        hist_clone = hist_clone.ProjectionX(f"{hname}_proj_{i}")
+        hist_clone.SetDirectory(0)
+
+        if args.inverted:
+            for ibin, is_empty in enumerate(empty_bins, start=1):
+                if is_empty:
+                    continue
+
+                val = hist_clone.GetBinContent(ibin)
+                err = hist_clone.GetBinError(ibin)
+
+                hist_clone.SetBinContent(ibin, 1.0 - val)
+                hist_clone.SetBinError(ibin, err)
+                
         if args.normalize:
             integral = hist_clone.Integral()
             if integral > 0:
