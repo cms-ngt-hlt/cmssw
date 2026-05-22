@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 
 : <<'COMMENT'
-Assuming input DQM file, obtained by activating the hltTauValidation_deltaR sequence (de-activated by default) 
-Command example for HLT validation:
+
+Usage: run_tau_deltaR_dqm_plots.sh [HLT|RECO]
+  HLT   - use HLT DQM path and labels (default)
+  RECO  - use RECO DQM path and labels
+
+It assumes input DQM file, obtained by activating the hlt/recoTauValidation_deltaR sequence (de-activated by default) 
+Command example for HLT validation to obtain the DQM file (based on CMSSW_16_1_0_pre4):
 
 cmsDriver.py step2 -s L1P2GT,HLT:75e33,VALIDATION:@hltValidation -n -1 --nThreads 0 \
  --conditions auto:phase2_realistic_T35 --datatier GEN-SIM-DIGI-RAW,DQMIO \
@@ -18,6 +23,26 @@ COMMENT
 
 set -u
 
+mode="HLT"
+if [ "$#" -gt 0 ]; then
+    mode="$1"
+fi
+
+mode_upper="${mode^^}"
+case "$mode_upper" in
+    HLT)
+        STEP="HLT"
+        BASE_DIR="DQMData/Run 1/HLT/Run summary/Tau/TauValidation_DeltaR"
+        ;;
+    RECO)
+        STEP="Reco"
+        BASE_DIR="DQMData/Run 1/Tau/Run summary/TauValidation_DeltaR"
+        ;;
+    *)
+        echo "Invalid mode: $mode"
+        ;;
+esac
+
 # Change label according to the input file used
 ENERGY_TEXT="Ten Tau (200 PU) | 13.6 TeV"
 
@@ -27,11 +52,7 @@ SCRIPT_DIR="${CMSSW_BASE}/src/Validation/RecoTau/scripts"
 MAKE_COMPARISON="${SCRIPT_DIR}/makeComparisonPlots.py"
 MAKE_TAU_VALIDATION="${SCRIPT_DIR}/makeTauValidationPlots.py"
 
-BASE_DIR="DQMData/Run 1/HLT/Run summary/Tau/TauValidation_DeltaR"
-
-OUTDIR_COMPARISON="TauValidationPlots/Comparisons"
-OUTDIR_SUMMARY="TauValidationPlots/Summary"
-OUTDIR_RESPONSE="TauValidationPlots/Response"
+OUTDIR_COMPARISON="TauValidationPlots/Comparison_DeltaR_$mode_upper"
 
 DELTAR_DIRS=(
     "DeltaR0p3"
@@ -109,6 +130,7 @@ make_comparison_plot() {
         --labels "$(join_by_comma "${labels[@]}")"
         --xlabel "$xlabel"
         --ylabel "$ylabel"
+        --leg-title "$STEP Tau Performance"
         --energy-text "$ENERGY_TEXT"
         --odir "$OUTDIR_COMPARISON"
         --name "$name"
@@ -145,15 +167,15 @@ echo "$DQM_FILE"
 echo
 echo "Making comparison plots"
 
-make_comparison_plot "Eff_vs_pt" "Eff_vs_pt_DeltaR_comparison" 'Simulated $\tau$ $p_T$ [GeV]' "Efficiency" "0,300" "0,1.3" "0,2" "$PT_REBIN"
-make_comparison_plot "Eff_vs_mass" "Eff_vs_mass_DeltaR_comparison" 'Simulated $\tau$ mass [GeV]' "Efficiency" "0,2" "0,1.3" "0,2" "2"
-make_comparison_plot "Eff_vs_eta" "Eff_vs_eta_DeltaR_comparison" 'Simulated $\tau$ $\eta$' "Efficiency" "-2.5,2.5" "0,1.3" "0.5,1.5" "$ETA_REBIN"
-make_comparison_plot "Eff_vs_phi" "Eff_vs_phi_DeltaR_comparison" 'Simulated $\tau$ $\phi$' "Efficiency" "" "0,1.3" "0.5,1.5" "$PHI_REBIN"
+make_comparison_plot "Eff_vs_pt" "Eff_vs_pt_DeltaR_comparison" 'Simulated $\tau$ $p_T$ [GeV]' "Efficiency" "0,300" "0,1.4" "0,2" "$PT_REBIN"
+make_comparison_plot "Eff_vs_mass" "Eff_vs_mass_DeltaR_comparison" 'Simulated $\tau$ mass [GeV]' "Efficiency" "0,2" "0,1.4" "0,2" "2"
+make_comparison_plot "Eff_vs_eta" "Eff_vs_eta_DeltaR_comparison" 'Simulated $\tau$ $\eta$' "Efficiency" "-2.5,2.5" "0,1.4" "0.5,1.5" "$ETA_REBIN"
+make_comparison_plot "Eff_vs_phi" "Eff_vs_phi_DeltaR_comparison" 'Simulated $\tau$ $\phi$' "Efficiency" "" "0,1.4" "0.5,1.5" "$PHI_REBIN"
 
-make_comparison_plot "Fake_vs_pt" "Fake_vs_pt_DeltaR_comparison" '$\tau$ $p_T$ [GeV]' "Fake rate" "0,300" "0,1.3" "0.5,1.5" "$PT_REBIN" 1
-make_comparison_plot "Fake_vs_mass" "Fake_vs_mass_DeltaR_comparison" '$\tau$ mass [GeV]' "Fake rate" "0,2" "0,1.3" "0.5,1.5" "2" 1
-make_comparison_plot "Fake_vs_eta" "Fake_vs_eta_DeltaR_comparison" '$\tau$ $\eta$' "Fake rate" "-2.5,2.5" "0,1.3" "0.5,1.5" "$ETA_REBIN" 1
-make_comparison_plot "Fake_vs_phi" "Fake_vs_phi_DeltaR_comparison" '$\tau$ $\phi$' "Fake rate" "" "0,1.3" "0.5,1.5" "$PHI_REBIN" 1
+make_comparison_plot "Fake_vs_pt" "Fake_vs_pt_DeltaR_comparison" '$\tau$ $p_T$ [GeV]' "Fake rate" "0,300" "0,1.4" "0.5,1.5" "$PT_REBIN" 1
+make_comparison_plot "Fake_vs_mass" "Fake_vs_mass_DeltaR_comparison" '$\tau$ mass [GeV]' "Fake rate" "0,2" "0,1.4" "0.5,1.5" "2" 1
+make_comparison_plot "Fake_vs_eta" "Fake_vs_eta_DeltaR_comparison" '$\tau$ $\eta$' "Fake rate" "-2.5,2.5" "0,1.4" "0.5,1.5" "$ETA_REBIN" 1
+make_comparison_plot "Fake_vs_phi" "Fake_vs_phi_DeltaR_comparison" '$\tau$ $\phi$' "Fake rate" "" "0,1.4" "0.5,1.5" "$PHI_REBIN" 1
 
 make_comparison_plot "Dup_vs_pt" "Dup_vs_pt_DeltaR_comparison" '$\tau$ $p_T$ [GeV]' "Duplicate rate" "0,300" "0,1" "0,2" "$PT_REBIN"
 make_comparison_plot "Dup_vs_mass" "Dup_vs_mass_DeltaR_comparison" '$\tau$ $mass$ [GeV]' "Duplicate rate" "0,2" "0,1" "0,2" "2"

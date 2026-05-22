@@ -20,6 +20,7 @@ def main():
     parser.add_argument("--xlim", type=str, default=None, help="X-axis limits, min,max.")
     parser.add_argument("--ylim", type=str, default=None, help="Y-axis limits, min,max.")
     parser.add_argument("--ylim-ratio", type=str, default=None, help="Y-axis limits for ratio plot, min,max.")
+    parser.add_argument("--leg-title", type=str, default="", help="Title for the legend.")
     parser.add_argument("--logy", action="store_true", help="Use logarithmic scale for y-axis.")
     parser.add_argument("--logx", action="store_true", help="Use logarithmic scale for x-axis.")
     parser.add_argument("--xlabel", type=str, default=None, help="Custom x-axis label.")
@@ -84,6 +85,7 @@ def main():
         xlim=parse_limits(args.xlim),
         ylim=parse_limits(args.ylim),
         ylim_ratio=parse_limits(args.ylim_ratio),
+        leg_title=args.leg_title,
         logx=args.logx,
         logy=args.logy,
         cms_text=args.cms_text,

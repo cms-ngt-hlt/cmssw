@@ -452,7 +452,9 @@ class DQMPlotter:
             ax.yaxis.get_offset_text().set_horizontalalignment("right")
             ax.yaxis.get_offset_text().set_verticalalignment("bottom")
 
-    def plot_comparison(self, histograms, labels, output_path, x_lim=[None, None], y_lim=[None, None], y_lim_ratio=[None, None], xlabel=None, ylabel=None, logy=False, logx=False, cms_text="Preliminary", energy_text=""):
+    def plot_comparison(self, histograms, labels, output_path, 
+        x_lim=[None, None], y_lim=[None, None], y_lim_ratio=[None, None],
+        xlabel=None, ylabel=None, leg_title="", logy=False, logx=False, cms_text="Preliminary", energy_text=""):
         """
         Create comparison plot with ratio panel.
 
@@ -546,7 +548,7 @@ class DQMPlotter:
         if logx:
             ax_main.set_xscale("log")
 
-        self._configure_legend(ax_main, labels, "")
+        self._configure_legend(ax_main, labels, leg_title)
 
         ax_main.grid(True, alpha=0.75, linestyle="dashdot", linewidth=0.75)
 
@@ -705,8 +707,8 @@ def make_sigma_over_mean_hist(sigma_profile, mean_profile, name):
     return _default_plotter.make_sigma_over_mean_hist(sigma_profile, mean_profile, name)
 
 
-def plot_comparison(histograms, labels, output_path, xlabel=None, ylabel=None, xlim=None, ylim=None, ylim_ratio=None, logx=False, logy=False, cms_text="Preliminary", energy_text=""):
-    return _default_plotter.plot_comparison(histograms, labels, output_path, x_lim=xlim or [None, None], y_lim=ylim or [None, None], y_lim_ratio=ylim_ratio or [None, None], xlabel=xlabel, ylabel=ylabel, logx=logx, logy=logy, cms_text=cms_text, energy_text=energy_text)
+def plot_comparison(histograms, labels, output_path, xlabel=None, ylabel=None, xlim=None, ylim=None, ylim_ratio=None, leg_title="", logx=False, logy=False, cms_text="Preliminary", energy_text=""):
+    return _default_plotter.plot_comparison(histograms, labels, output_path, x_lim=xlim or [None, None], y_lim=ylim or [None, None], y_lim_ratio=ylim_ratio or [None, None], xlabel=xlabel, ylabel=ylabel, leg_title=leg_title, logx=logx, logy=logy, cms_text=cms_text, energy_text=energy_text)
 
 
 def plot_counts_and_rate(denominator, numerator, rate, output_path, denominator_label, numerator_label, rate_label, xlabel, ylabel_rate, cms_text="Preliminary", energy_text="", right_ylim=(0.0, 1.25), right_log=False, text=None):
