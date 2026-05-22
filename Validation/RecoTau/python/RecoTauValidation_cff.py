@@ -1,4 +1,56 @@
 import FWCore.ParameterSet.Config as cms
+
+from Validation.RecoTau.TauValidationRECO import TauValidationRECO as _TauValidationRECO
+
+recoTauValidation = _TauValidationRECO(
+    recoTauCollection = "hpsPFTauProducer",
+    genTauCollection = "tauGenJetsSelectorAllHadrons", # only GenTaus decaying hadronically
+    minDeltaR = 0.3,
+    outFolder = "Tau/TauValidation",
+    isHLT = False
+)
+
+recoTauValidation_deltaR0p3 = recoTauValidation.clone(
+    minDeltaR = 0.3,
+    outFolder = "Tau/TauValidation_DeltaR/DeltaR0p3",
+)
+
+recoTauValidation_deltaR0p25 = recoTauValidation.clone(
+    minDeltaR = 0.25,
+    outFolder = "Tau/TauValidation_DeltaR/DeltaR0p25",
+)
+
+recoTauValidation_deltaR0p2 = recoTauValidation.clone(
+    minDeltaR = 0.2,
+    outFolder = "Tau/TauValidation_DeltaR/DeltaR0p2",
+)
+
+recoTauValidation_deltaR0p15 = recoTauValidation.clone(
+    minDeltaR = 0.15,
+    outFolder = "Tau/TauValidation_DeltaR/DeltaR0p15",
+)
+
+recoTauValidation_deltaR0p1 = recoTauValidation.clone(
+    minDeltaR = 0.1,
+    outFolder = "Tau/TauValidation_DeltaR/DeltaR0p1",
+)
+
+recoTauValidation_deltaR = cms.Sequence(
+    recoTauValidation_deltaR0p3 +
+    recoTauValidation_deltaR0p25 +
+    recoTauValidation_deltaR0p2 +
+    recoTauValidation_deltaR0p15 +
+    recoTauValidation_deltaR0p1
+)
+
+recoTauValidationSequence = cms.Sequence(
+    recoTauValidation
+    # only for testing DeltaR matching
+    + recoTauValidation_deltaR
+)
+
+# Old Run-3 validation, not maintained for Phase-2
+
 from Validation.RecoTau.dataTypes.ValidateTausOnRealData_cff import *
 from Validation.RecoTau.dataTypes.ValidateTausOnRealElectronsData_cff import *
 from Validation.RecoTau.dataTypes.ValidateTausOnRealMuonsData_cff import *
