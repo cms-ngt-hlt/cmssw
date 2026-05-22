@@ -2,13 +2,13 @@
 
 set -u
 
-DQM_FILE="../DQM_V0001_R000000001__Global__CMSSW_X_Y_Z__RECO.root"
-SCRIPT_DIR="../Validation/RecoTau/scripts"
+DQM_FILE="DQM_V0001_R000000001__Global__CMSSW_X_Y_Z__RECO.root"
+SCRIPT_DIR="${CMSSW_BASE}/src/Validation/RecoTau/scripts"
 
 MAKE_COMPARISON="${SCRIPT_DIR}/makeComparisonPlots.py"
 MAKE_TAU_VALIDATION="${SCRIPT_DIR}/makeTauValidationPlots.py"
 
-BASE_DIR="DQMData/Run 1/HLT/Run summary/Tau/TauValidation"
+BASE_DIR="DQMData/Run 1/HLT/Run summary/Tau/TauValidation_DeltaR"
 
 OUTDIR_COMPARISON="TauValidationPlots/Comparisons"
 OUTDIR_SUMMARY="TauValidationPlots/Summary"
