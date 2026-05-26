@@ -3,8 +3,12 @@ import FWCore.ParameterSet.Config as cms
 from Validation.RecoTau.TauValidationRECO import TauValidationRECO as _TauValidationRECO
 
 hltTauValidation = _TauValidationRECO(
-    recoTauCollection = "hltHpsPFTauProducer",
     genTauCollection = "tauGenJetsSelectorAllHadrons", # only GenTaus decaying hadronically
+    recoTauCollection = "hltHpsPFTauProducer",
+    recoTauIDCollectionVsJet = "hltHpsPFTauDeepTauProducer:VSjet",
+    recoTauIDCollectionVsE = "hltHpsPFTauDeepTauProducer:VSe",
+    recoTauIDCollectionVsMu = "hltHpsPFTauDeepTauProducer:VSmu",
+    cutIDs = [0.5, 0., 0.], # vsJet, vsE, vsMu
     minDeltaR = 0.3,
     outFolder = "HLT/Tau/TauValidation",
     isHLT = True

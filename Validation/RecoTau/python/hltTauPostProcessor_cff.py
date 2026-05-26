@@ -3,7 +3,8 @@ from DQMServices.Core.DQMEDHarvester import DQMEDHarvester
 
 hltTauPostProcessor = DQMEDHarvester("DQMGenericClient",
     subDirs=cms.untracked.vstring("HLT/Tau/TauValidation/", "HLT/Tau/TauValidation_DeltaR/*"),
-    efficiency = cms.vstring(),
+    efficiency = cms.vstring( # [TOD] add 2D efficiency
+    ),
     efficiencyProfile = cms.untracked.vstring( # for smoother rebinning
         # Efficiency
         "Eff_vs_eta 'Efficiency vs #eta' genTauMatched_eta genTau_eta",
@@ -15,11 +16,17 @@ hltTauPostProcessor = DQMEDHarvester("DQMGenericClient",
         "Fake_vs_phi 'Fake Rate vs #phi' recoTauMatched_phi recoTau_phi fake",
         "Fake_vs_pt 'Fake Rate vs p_{T}' recoTauMatched_pt recoTau_pt fake",
         "Fake_vs_mass 'Fake Rate vs mass' recoTauMatched_mass recoTau_mass fake",
+        "Fake_vs_idJet 'Fake Rate vs ID vs Jet' recoTauMatched_idJet recoTau_idJet fake",
+        "Fake_vs_idE 'Fake Rate vs ID vs E' recoTauMatched_idE recoTau_idE fake",
+        "Fake_vs_idMu 'Fake Rate vs ID vs Mu' recoTauMatched_idMu recoTau_idMu fake",
         # Duplicate rate
         "Dup_vs_eta 'Duplicate Rate vs #eta' recoTauMultiMatched_eta recoTau_eta",
         "Dup_vs_phi 'Duplicate Rate vs #phi' recoTauMultiMatched_phi recoTau_phi",
         "Dup_vs_pt 'Duplicate Rate vs p_{T}' recoTauMultiMatched_pt recoTau_pt",
         "Dup_vs_mass 'Duplicate Rate vs mass' recoTauMultiMatched_mass recoTau_mass",
+        "Dup_vs_idJet 'Duplicate Rate vs ID vs Jet' recoTauMultiMatched_idJet recoTau_idJet",
+        "Dup_vs_idE 'Duplicate Rate vs ID vs E' recoTauMultiMatched_idE recoTau_idE",
+        "Dup_vs_idMu 'Duplicate Rate vs ID vs Mu' recoTauMultiMatched_idMu recoTau_idMu",
         # Split rate
         "Split_vs_eta 'Split Rate vs #eta' genTauMultiMatched_eta genTau_eta",
         "Split_vs_phi 'Split Rate vs #phi' genTauMultiMatched_phi genTau_phi",
