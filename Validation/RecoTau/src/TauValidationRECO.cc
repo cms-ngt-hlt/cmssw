@@ -123,30 +123,30 @@ void TauValidationRECO::bookHistograms(DQMStore::IBooker& ibooker, edm::Run cons
   // Book 1D histograms for gen and reco tau kinematics
   for (auto& hVar : histoVars) {
     auto [nBins, hMin, hMax] = hVar.second;
-    h_recoTau_[hVar.first] = ibooker.book1D("recoTau_" + hVar.first, ";#tau^{reco};" + hVar.first, nBins, hMin, hMax);
-    h_recoTauMatched_[hVar.first] = ibooker.book1D("recoTauMatched_" + hVar.first, ";#tau^{reco} (Matched);" + hVar.first, nBins, hMin, hMax);
-    h_recoTauMultiMatched_[hVar.first] = ibooker.book1D("recoTauMultiMatched_" + hVar.first, ";#tau^{reco} (Multi-Matched);" + hVar.first, nBins, hMin, hMax);
-    h_genTau_[hVar.first] = ibooker.book1D("genTau_" + hVar.first, "#tau^{gen};" + hVar.first, nBins, hMin, hMax);
-    h_genTauMatched_[hVar.first] = ibooker.book1D("genTauMatched_" + hVar.first, ";#tau^{gen} (Matched);" + hVar.first, nBins, hMin, hMax);
-    h_genTauMultiMatched_[hVar.first] = ibooker.book1D("genTauMultiMatched_" + hVar.first, ";#tau^{gen} (Multi-Matched);" + hVar.first, nBins, hMin, hMax);
-    h2d_responsePt_[hVar.first] = ibooker.book2D("responsePt_" + hVar.first, ";#tau Pt Response;" + hVar.first, nBins, hMin, hMax, 50, 0., 2.);
-    h2d_responseMass_[hVar.first] = ibooker.book2D("responseMass_" + hVar.first, ";#tau Mass Response;" + hVar.first, nBins, hMin, hMax, 50, 0., 2.);
+    h_recoTau_[hVar.first] = ibooker.book1D("recoTau_" + hVar.first, "#tau^{reco};" + hVar.first + ";", nBins, hMin, hMax);
+    h_recoTauMatched_[hVar.first] = ibooker.book1D("recoTauMatched_" + hVar.first, "#tau^{reco} (Matched);" + hVar.first + ";", nBins, hMin, hMax);
+    h_recoTauMultiMatched_[hVar.first] = ibooker.book1D("recoTauMultiMatched_" + hVar.first, "#tau^{reco} (Multi-Matched);" + hVar.first + ";", nBins, hMin, hMax);
+    h_genTau_[hVar.first] = ibooker.book1D("genTau_" + hVar.first, "#tau^{gen};" + hVar.first + ";", nBins, hMin, hMax);
+    h_genTauMatched_[hVar.first] = ibooker.book1D("genTauMatched_" + hVar.first, "#tau^{gen} (Matched);" + hVar.first + ";", nBins, hMin, hMax);
+    h_genTauMultiMatched_[hVar.first] = ibooker.book1D("genTauMultiMatched_" + hVar.first, "#tau^{gen} (Multi-Matched);" + hVar.first + ";", nBins, hMin, hMax);
+    h2d_responsePt_[hVar.first] = ibooker.book2D("responsePt_" + hVar.first, "#tau^{gen} (Matched);" + hVar.first + ";#tau Pt Response", nBins, hMin, hMax, 50, 0., 2.);
+    h2d_responseMass_[hVar.first] = ibooker.book2D("responseMass_" + hVar.first, "#tau^{gen} (Matched);" + hVar.first + ";#tau Mass Response", nBins, hMin, hMax, 50, 0., 2.);
 
     // Book 2D histograms for reco tau ID discriminators vs kinematics (dynamic based on idLabels)
     for (const auto& label : recoTauIDLabels_) {
       std::string idName = "id" + label + "_" + hVar.first;
-      h2d_recoTau_[idName] = ibooker.book2D("recoTau_" + idName, ";#tau^{reco}; ID" + label + ";" + hVar.first, 50, 0., 1., nBins, hMin, hMax);
-      h2d_recoTauMatched_[idName] = ibooker.book2D("recoTauMatched_" + idName, ";#tau^{reco} (Matched); ID" + label + ";" + hVar.first, 50, 0., 1., nBins, hMin, hMax);
-      h2d_recoTauMultiMatched_[idName] = ibooker.book2D("recoTauMultiMatched_" + idName, ";#tau^{reco} (Multi-Matched); ID" + label + ";" + hVar.first, 50, 0., 1., nBins, hMin, hMax);
+      h2d_recoTau_[idName] = ibooker.book2D("recoTau_" + idName, "#tau^{reco}; ID" + label + ";" + hVar.first, 50, 0., 1., nBins, hMin, hMax);
+      h2d_recoTauMatched_[idName] = ibooker.book2D("recoTauMatched_" + idName, "#tau^{reco} (Matched); ID" + label + ";" + hVar.first, 50, 0., 1., nBins, hMin, hMax);
+      h2d_recoTauMultiMatched_[idName] = ibooker.book2D("recoTauMultiMatched_" + idName, "#tau^{reco} (Multi-Matched); ID" + label + ";" + hVar.first, 50, 0., 1., nBins, hMin, hMax);
     }
   }
 
   // Book 1D histograms for reco tau ID discriminators (dynamic based on idLabels)
   for (const auto& label : recoTauIDLabels_) {
     std::string idName = "id" + label;
-    h_recoTau_[idName] = ibooker.book1D("recoTau_" + idName, ";#tau^{reco};" + idName, 50, 0., 1.);
-    h_recoTauMatched_[idName] = ibooker.book1D("recoTauMatched_" + idName, ";#tau^{reco} (Matched);" + idName, 50, 0., 1.);
-    h_recoTauMultiMatched_[idName] = ibooker.book1D("recoTauMultiMatched_" + idName, ";#tau^{reco} (Multi-Matched);" + idName, 50, 0., 1.);
+    h_recoTau_[idName] = ibooker.book1D("recoTau_" + idName, "#tau^{reco};" + idName + ";", 50, 0., 1.);
+    h_recoTauMatched_[idName] = ibooker.book1D("recoTauMatched_" + idName, "#tau^{reco} (Matched);" + idName + ";", 50, 0., 1.);
+    h_recoTauMultiMatched_[idName] = ibooker.book1D("recoTauMultiMatched_" + idName, "#tau^{reco} (Multi-Matched);" + idName + ";", 50, 0., 1.);
   }
 
   // Book 2D histograms for gen and reco tau kinematics
@@ -154,12 +154,12 @@ void TauValidationRECO::bookHistograms(DQMStore::IBooker& ibooker, edm::Run cons
     auto [nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY] = h2dVar.second;
     auto x_title = h2dVar.first.substr(0, h2dVar.first.find("_"));
     auto y_title = h2dVar.first.substr(h2dVar.first.find("_") + 1);
-    h2d_recoTau_[h2dVar.first] = ibooker.book2D("recoTau_" + h2dVar.first, ";#tau^{reco}" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
-    h2d_recoTauMatched_[h2dVar.first] = ibooker.book2D("recoTauMatched_" + h2dVar.first, ";#tau^{reco} (Matched);" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
-    h2d_recoTauMultiMatched_[h2dVar.first] = ibooker.book2D("recoTauMultiMatched_" + h2dVar.first, ";#tau^{reco} (Multi-Matched);" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
-    h2d_genTau_[h2dVar.first] = ibooker.book2D("genTau_" + h2dVar.first, ";#tau^{gen}" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
-    h2d_genTauMatched_[h2dVar.first] = ibooker.book2D("genTauMatched_" + h2dVar.first, ";#tau^{gen} (Matched);" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
-    h2d_genTauMultiMatched_[h2dVar.first] = ibooker.book2D("genTauMultiMatched_" + h2dVar.first, ";#tau^{gen} (Multi-Matched);" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
+    h2d_recoTau_[h2dVar.first] = ibooker.book2D("recoTau_" + h2dVar.first, "#tau^{reco};" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
+    h2d_recoTauMatched_[h2dVar.first] = ibooker.book2D("recoTauMatched_" + h2dVar.first, "#tau^{reco} (Matched);" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
+    h2d_recoTauMultiMatched_[h2dVar.first] = ibooker.book2D("recoTauMultiMatched_" + h2dVar.first, "#tau^{reco} (Multi-Matched);" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
+    h2d_genTau_[h2dVar.first] = ibooker.book2D("genTau_" + h2dVar.first, "#tau^{gen};" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
+    h2d_genTauMatched_[h2dVar.first] = ibooker.book2D("genTauMatched_" + h2dVar.first, "#tau^{gen} (Matched);" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
+    h2d_genTauMultiMatched_[h2dVar.first] = ibooker.book2D("genTauMultiMatched_" + h2dVar.first, "#tau^{gen} (Multi-Matched);" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
   }
 
 }
