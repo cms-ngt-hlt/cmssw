@@ -4,6 +4,12 @@
 #include "Validation/RecoTau/interface/TauValidationRECO.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 
+#include <cstddef>
+#include <sstream>
+#include <iomanip>
+#include <cmath>
+#include <array>
+
 using namespace edm;
 using namespace reco;
 using namespace std;
@@ -11,7 +17,7 @@ using namespace std;
 std::string TauValidationRECO::convertId(double cut) {
   if (cut == 0.0) return "0p0";
   std::ostringstream oss;
-  oss << std::fixed << std::setprecision(1) << cut;
+  oss << std::fixed << std::setprecision(2) << cut;
   std::string result = oss.str();
   for (char& c : result) {
     if (c == '.') c = 'p';
@@ -19,57 +25,99 @@ std::string TauValidationRECO::convertId(double cut) {
   return result;
 }
 
-bool TauValidationRECO::passIdCut(const reco::PFTauRef& tauRef, const std::vector<double> &cutIDs,
-  const reco::TauDiscriminatorContainer* recoTauIDjet,
-  const reco::TauDiscriminatorContainer* recoTauIDe,
-  const reco::TauDiscriminatorContainer* recoTauIDmu) {
+bool TauValidationRECO::passIdCut(const reco::PFTauRef& tauRef,
+                                  const std::vector<const reco::TauDiscriminatorContainer*>& validRecoTauIDs,
+                                  const std::vector<double>& validCutIDs_raw, const std::vector<int>& validCutIDs_wp,
+                                  bool use_raw, bool use_wp) {
 
-  if (cutIDs[0] == 0.0 && cutIDs[1] == 0.0 && cutIDs[2] == 0.0) return true;
-
-  if (cutIDs[0] != 0.0) { // vs Jet ID cut
-    if (!recoTauIDjet) return false;
-    const auto &jetDisc = (*recoTauIDjet)[tauRef];
-    if (jetDisc.rawValues.empty() || jetDisc.rawValues[0] <= cutIDs[0]) return false;
-  }
-  if (cutIDs[1] != 0.0) { // vs E ID cut
-    if (!recoTauIDe) return false;
-    const auto &eDisc = (*recoTauIDe)[tauRef];
-    if (eDisc.rawValues.empty() || eDisc.rawValues[0] <= cutIDs[1]) return false;
-  }
-  if (cutIDs[2] != 0.0) { // vs Mu ID cut
-    if (!recoTauIDmu) return false;
-    const auto &muDisc = (*recoTauIDmu)[tauRef];
-    if (muDisc.rawValues.empty() || muDisc.rawValues[0] <= cutIDs[2]) return false;
+  if (use_raw) {
+    for (size_t i = 0; i < validRecoTauIDs.size(); ++i) {
+      const auto& disc = (*validRecoTauIDs[i])[tauRef];
+      if (validCutIDs_raw[i] != 0.0) {
+        if (disc.rawValues.empty() || disc.rawValues[0] <= validCutIDs_raw[i]) {
+          return false;
+        }
+      }
+    }
+    return true; // Passes all raw cuts
   }
 
-  return true;
+  if (use_wp) {
+    for (size_t i = 0; i < validRecoTauIDs.size(); ++i) {
+      const auto& disc = (*validRecoTauIDs[i])[tauRef];
+      if (validCutIDs_wp[i] >= 0) {
+        if (disc.workingPoints.size() <= static_cast<size_t>(validCutIDs_wp[i]) || !disc.workingPoints[validCutIDs_wp[i]]) {
+          return false;
+        }
+      }
+    }
+    return true; // Passes all WP cuts
+  }
+
+  return true; // If no cuts specified, pass by default
+
 }
 
 TauValidationRECO::TauValidationRECO(const edm::ParameterSet& iConfig) {
   genTauToken_ = consumes<reco::GenJetCollection>(iConfig.getParameter<edm::InputTag>("genTauCollection"));
   recoTauToken_ = consumes<reco::PFTauCollection>(iConfig.getParameter<edm::InputTag>("recoTauCollection"));
-  recoTauIDjetToken_ = consumes<reco::TauDiscriminatorContainer>(iConfig.getParameter<edm::InputTag>("recoTauIDCollectionVsJet"));
-  recoTauIDeToken_ = consumes<reco::TauDiscriminatorContainer>(iConfig.getParameter<edm::InputTag>("recoTauIDCollectionVsE"));
-  recoTauIDmuToken_ = consumes<reco::TauDiscriminatorContainer>(iConfig.getParameter<edm::InputTag>("recoTauIDCollectionVsMu"));
-  cutIDs = iConfig.getParameter<std::vector<double>>("cutIDs"); // expects 3 entries: vsJet, vsE, vsMu
   matchingDeltaR = iConfig.getParameter<double>("minDeltaR");
   outFolder = iConfig.getParameter<std::string>("outFolder");
   isHLT = iConfig.getUntrackedParameter<bool>("isHLT");
 
-  if (cutIDs.size() < 3) cutIDs.resize(3, 0.0);  // fills missing entries with 0.0
+  std::vector<edm::InputTag> idTags = iConfig.getParameter<std::vector<edm::InputTag>>("recoTauIDCollections");
+  for (const auto& tag : idTags) {
+    // Extract label from the instance part of the InputTag (e.g., "VSjet" from "module:VSjet")
+    recoTauIDTokens_.push_back(consumes<reco::TauDiscriminatorContainer>(tag));
+    recoTauIDLabels_.push_back(tag.instance());
+  }
+
+  cutIDs_wp = iConfig.getParameter<std::vector<int>>("cutIDs_wp");
+  cutIDs_raw = iConfig.getParameter<std::vector<double>>("cutIDs_raw");
+
+  use_wp = std::any_of(cutIDs_wp.begin(), cutIDs_wp.end(), [](int x){ return x >= 0; });
+  use_raw = std::any_of(cutIDs_raw.begin(), cutIDs_raw.end(), [](double x){ return x != 0.0; });
+
+  if (use_wp && use_raw) {
+      throw cms::Exception("Configuration") << "Specify either cutIDs_wp OR cutIDs_raw, not both";
+  }
+
+  if (!recoTauIDLabels_.empty()) {
+    if ((use_wp) && (cutIDs_wp.size() != recoTauIDLabels_.size())) {
+      cutIDs_wp.resize(recoTauIDLabels_.size(), -1);
+      edm::LogPrint("TauValidationRECO") << "Warning: cutIDs_wp size (" << cutIDs_wp.size() 
+        << ") adjusted to match idLabels size (" << recoTauIDLabels_.size() << ")";
+    }
+    if ((use_raw) && (cutIDs_raw.size() != recoTauIDLabels_.size())) {
+      cutIDs_raw.resize(recoTauIDLabels_.size(), 0.0);
+      edm::LogPrint("TauValidationRECO") << "Warning: cutIDs_raw size (" << cutIDs_raw.size() 
+        << ") adjusted to match idLabels size (" << recoTauIDLabels_.size() << ")";
+    }
+  }
 
 }
 
 void TauValidationRECO::bookHistograms(DQMStore::IBooker& ibooker, edm::Run const& iRun, edm::EventSetup const&) {
 
   // ---------------------------- Book Summary Histograms -------------------------------
-  applyIdCuts = !cutIDs.empty() && !(cutIDs[0] == 0.0 && cutIDs[1] == 0.0 && cutIDs[2] == 0.0);
-  if (applyIdCuts) {
-    outFolder += "_IdCuts";
-    outFolder += cutIDs[0] != 0.0 ? "_jet" + convertId(cutIDs[0]) : "";
-    outFolder += cutIDs[1] != 0.0 ? "_e" + convertId(cutIDs[1]) : "";
-    outFolder += cutIDs[2] != 0.0 ? "_mu" + convertId(cutIDs[2]) : "";
+
+  if (use_wp) {
+    outFolder += "/CutWP";
+    for (size_t i = 0; i < recoTauIDLabels_.size(); ++i) {
+      if (cutIDs_wp[i] >= 0) {
+        outFolder += "_" + recoTauIDLabels_[i] + std::to_string(cutIDs_wp[i]);
+      }
+    }
   }
+  if (use_raw) {
+    outFolder += "/CutID";
+    for (size_t i = 0; i < recoTauIDLabels_.size(); ++i) {
+      if (cutIDs_raw[i] > 0) {
+        outFolder += "_" + recoTauIDLabels_[i] + convertId(cutIDs_raw[i]);
+      }
+    }
+  }
+
   ibooker.setCurrentFolder(outFolder);
   
   // Book 1D histograms for gen and reco tau kinematics
@@ -83,14 +131,22 @@ void TauValidationRECO::bookHistograms(DQMStore::IBooker& ibooker, edm::Run cons
     h_genTauMultiMatched_[hVar.first] = ibooker.book1D("genTauMultiMatched_" + hVar.first, ";#tau^{gen} (Multi-Matched);" + hVar.first, nBins, hMin, hMax);
     h2d_responsePt_[hVar.first] = ibooker.book2D("responsePt_" + hVar.first, ";#tau Pt Response;" + hVar.first, nBins, hMin, hMax, 50, 0., 2.);
     h2d_responseMass_[hVar.first] = ibooker.book2D("responseMass_" + hVar.first, ";#tau Mass Response;" + hVar.first, nBins, hMin, hMax, 50, 0., 2.);
+
+    // Book 2D histograms for reco tau ID discriminators vs kinematics (dynamic based on idLabels)
+    for (const auto& label : recoTauIDLabels_) {
+      std::string idName = "id" + label + "_" + hVar.first;
+      h2d_recoTau_[idName] = ibooker.book2D("recoTau_" + idName, ";#tau^{reco}; ID" + label + ";" + hVar.first, 50, 0., 1., nBins, hMin, hMax);
+      h2d_recoTauMatched_[idName] = ibooker.book2D("recoTauMatched_" + idName, ";#tau^{reco} (Matched); ID" + label + ";" + hVar.first, 50, 0., 1., nBins, hMin, hMax);
+      h2d_recoTauMultiMatched_[idName] = ibooker.book2D("recoTauMultiMatched_" + idName, ";#tau^{reco} (Multi-Matched); ID" + label + ";" + hVar.first, 50, 0., 1., nBins, hMin, hMax);
+    }
   }
 
-  // Book 1D histograms for reco tau ID discriminators
-  for (auto& hVar : histoVarsReco) {
-    auto [nBins, hMin, hMax] = hVar.second;
-    h_recoTau_[hVar.first] = ibooker.book1D("recoTau_" + hVar.first, ";#tau^{reco};" + hVar.first, nBins, hMin, hMax);
-    h_recoTauMatched_[hVar.first] = ibooker.book1D("recoTauMatched_" + hVar.first, ";#tau^{reco} (Matched);" + hVar.first, nBins, hMin, hMax);
-    h_recoTauMultiMatched_[hVar.first] = ibooker.book1D("recoTauMultiMatched_" + hVar.first, ";#tau^{reco} (Multi-Matched);" + hVar.first, nBins, hMin, hMax);
+  // Book 1D histograms for reco tau ID discriminators (dynamic based on idLabels)
+  for (const auto& label : recoTauIDLabels_) {
+    std::string idName = "id" + label;
+    h_recoTau_[idName] = ibooker.book1D("recoTau_" + idName, ";#tau^{reco};" + idName, 50, 0., 1.);
+    h_recoTauMatched_[idName] = ibooker.book1D("recoTauMatched_" + idName, ";#tau^{reco} (Matched);" + idName, 50, 0., 1.);
+    h_recoTauMultiMatched_[idName] = ibooker.book1D("recoTauMultiMatched_" + idName, ";#tau^{reco} (Multi-Matched);" + idName, 50, 0., 1.);
   }
 
   // Book 2D histograms for gen and reco tau kinematics
@@ -104,16 +160,6 @@ void TauValidationRECO::bookHistograms(DQMStore::IBooker& ibooker, edm::Run cons
     h2d_genTau_[h2dVar.first] = ibooker.book2D("genTau_" + h2dVar.first, ";#tau^{gen}" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
     h2d_genTauMatched_[h2dVar.first] = ibooker.book2D("genTauMatched_" + h2dVar.first, ";#tau^{gen} (Matched);" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
     h2d_genTauMultiMatched_[h2dVar.first] = ibooker.book2D("genTauMultiMatched_" + h2dVar.first, ";#tau^{gen} (Multi-Matched);" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
-  }
-
-  // Book 2D histograms for reco tau ID discriminators vs kinematics
-  for (auto& h2dVar : histoVarsReco2D) {
-    auto [nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY] = h2dVar.second;
-    auto x_title = h2dVar.first.substr(0, h2dVar.first.find("_"));
-    auto y_title = h2dVar.first.substr(h2dVar.first.find("_") + 1);
-    h2d_recoTau_[h2dVar.first] = ibooker.book2D("recoTau_" + h2dVar.first, ";#tau^{reco}" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
-    h2d_recoTauMatched_[h2dVar.first] = ibooker.book2D("recoTauMatched_" + h2dVar.first, ";#tau^{reco} (Matched);" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
-    h2d_recoTauMultiMatched_[h2dVar.first] = ibooker.book2D("recoTauMultiMatched_" + h2dVar.first, ";#tau^{reco} (Multi-Matched);" + x_title + ";" + y_title, nBinsX, hMinX, hMaxX, nBinsY, hMinY, hMaxY);
   }
 
 }
@@ -144,44 +190,25 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
   }
   // std::cout << "Number of gen taus: " << genTaus->size() << std::endl; // [DEBUG]
 
-  bool useIdvsJet = true;
-  edm::Handle<reco::TauDiscriminatorContainer> recoTauIDjet;
-  mEvent.getByToken(recoTauIDjetToken_, recoTauIDjet);
-  if (!recoTauIDjet.isValid()) {
-    edm::LogPrint("TauValidationRECO") << "Reco Tau Identifier vs Jet collection not found while running TauValidationRECO.cc ";
-    useIdvsJet = false;
+  std::vector<const reco::TauDiscriminatorContainer*> validRecoTauIDs;
+  std::vector<std::string> validRecoTauIDLabels;
+  std::vector<double> validCutIDs_raw;
+  std::vector<int> validCutIDs_wp;
+  for (size_t i = 0; i < recoTauIDTokens_.size(); ++i) {
+    edm::Handle<reco::TauDiscriminatorContainer> recoTauID;
+    mEvent.getByToken(recoTauIDTokens_[i], recoTauID);
+    if (!recoTauID.isValid()) {
+      edm::LogPrint("TauValidationRECO") << "Reco Tau Identifier " << recoTauIDLabels_[i] << " collection not found while running TauValidationRECO.cc ";
+      continue;
+    }
+    validRecoTauIDs.push_back(recoTauID.product());
+    validRecoTauIDLabels.push_back(recoTauIDLabels_[i]);
+    validCutIDs_raw.push_back(cutIDs_raw[i]);
+    validCutIDs_wp.push_back(cutIDs_wp[i]);
   }
 
-  bool useIdvsE = true;
-  edm::Handle<reco::TauDiscriminatorContainer> recoTauIDe;
-  mEvent.getByToken(recoTauIDeToken_, recoTauIDe);
-  if (!recoTauIDe.isValid()) {
-    edm::LogPrint("TauValidationRECO") << "Reco Tau Identifier vs Electrons collection not found while running TauValidationRECO.cc ";
-    useIdvsE = false;
-  }
-
-  bool useIdvsMu = true;
-  edm::Handle<reco::TauDiscriminatorContainer> recoTauIDmu;
-  mEvent.getByToken(recoTauIDmuToken_, recoTauIDmu);
-  if (!recoTauIDmu.isValid()) {
-    edm::LogPrint("TauValidationRECO") << "Reco Tau Identifier vs Muons collection not found while running TauValidationRECO.cc ";
-    useIdvsMu = false;
-  }
-
-  // if (useIdvsJet && useIdvsE && useIdvsMu) { // [DEBUG]
-  //   for (size_t i = 0; i < recoTaus->size(); ++i) {
-  //     reco::PFTauRef tauRef(recoTaus, i);
-  //     const reco::SingleTauDiscriminatorContainer& discContainerJet = (*recoTauIDjet)[tauRef];
-  //     const reco::SingleTauDiscriminatorContainer& discContainerE = (*recoTauIDe)[tauRef];
-  //     const reco::SingleTauDiscriminatorContainer& discContainerMu = (*recoTauIDmu)[tauRef];
-  //     std::cout << "Tau " << i << " ID vs Jet = " << discContainerJet.rawValues[0] <<
-  //                   ", ID vs E = " << discContainerE.rawValues[0] <<
-  //                   ", ID vs Mu = " << discContainerMu.rawValues[0] << std::endl;
-  //     // for (size_t j = 0; j < discContainerJet.workingPoints.size(); ++j) {
-  //     //   std::cout << "Tau " << i << " WP[" << j << "] = " << discContainerJet.workingPoints[j] << std::endl;
-  //     // }
-  //   }
-  // }
+  bool plotId = validRecoTauIDs.size() > 0;
+  bool applyIdCuts = plotId && (use_wp || use_raw);
 
   // Loop for efficiency 
   for (uint itau = 0; itau < genTaus->size(); ++itau) {
@@ -203,7 +230,7 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
     float ResponseMass_bestDeltaR = 0.;
     for (uint jtau = 0; jtau < recoTaus->size(); ++jtau) {
       reco::PFTauRef tauRef(recoTaus, jtau);
-      if (applyIdCuts && !passIdCut(tauRef, cutIDs, recoTauIDjet.product(), recoTauIDe.product(), recoTauIDmu.product())) {
+      if (applyIdCuts && !passIdCut(tauRef, validRecoTauIDs, validCutIDs_raw, validCutIDs_wp, use_raw, use_wp)) {
         continue; // skip if tau doesn't pass ID cuts
       }
       float deltaRValue = deltaR(genTaus->at(itau), recoTaus->at(jtau));
@@ -254,23 +281,11 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
     }
   }
 
-  // Define tau ID structres for cleaner code in the loop below (vs Jet, vs E, vs Mu)
-  const std::array<std::tuple<const reco::TauDiscriminatorContainer*, bool, const char*>, 3> idInfo = {{
-    {recoTauIDjet.isValid() ? recoTauIDjet.product() : nullptr, useIdvsJet, "Jet"},
-    {recoTauIDe.isValid() ? recoTauIDe.product() : nullptr, useIdvsE, "E"},
-    {recoTauIDmu.isValid() ? recoTauIDmu.product() : nullptr, useIdvsMu, "Mu"}
-  }};
-
-  // Lambda function to get ID value or return -1 if ID collection is not valid
-  auto idValue = [&](const reco::TauDiscriminatorContainer* container, bool valid, const reco::PFTauRef& tauRef) {
-    return valid ? (*container)[tauRef].rawValues[0] : -1.;
-  };
-
   // Loop for fake rate 
   for (uint itau = 0; itau < recoTaus->size(); ++itau) {
     reco::PFTauRef tauRef(recoTaus, itau);
 
-    if (applyIdCuts && !passIdCut(tauRef, cutIDs, recoTauIDjet.product(), recoTauIDe.product(), recoTauIDmu.product())) {
+    if (applyIdCuts && !passIdCut(tauRef, validRecoTauIDs, validCutIDs_raw, validCutIDs_wp, use_raw, use_wp)) {
       continue; // skip if tau doesn't pass ID cuts
     }
 
@@ -284,14 +299,17 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
     h2d_recoTau_["mass_eta"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).eta());
     h2d_recoTau_["mass_phi"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).phi());
 
-    for (auto const& [container, valid, label] : idInfo) {
-      const double idRawValue = idValue(container, valid, tauRef);
-      const std::string idName = std::string("id") + label;
-      h_recoTau_[idName]->Fill(idRawValue);
-      h2d_recoTau_[idName + "_pt"]->Fill(idRawValue, recoTaus->at(itau).pt());
-      h2d_recoTau_[idName + "_eta"]->Fill(idRawValue, recoTaus->at(itau).eta());
-      h2d_recoTau_[idName + "_phi"]->Fill(idRawValue, recoTaus->at(itau).phi());
-      h2d_recoTau_[idName + "_mass"]->Fill(idRawValue, recoTaus->at(itau).mass());
+    if (plotId) {
+      for (size_t i = 0; i < validRecoTauIDLabels.size(); ++i) {
+        const auto& disc = (*validRecoTauIDs[i])[tauRef];
+        const double idRawValue = disc.rawValues.empty() ? -1. : disc.rawValues[0];
+        const std::string idName = "id" + validRecoTauIDLabels[i];
+        h_recoTau_[idName]->Fill(idRawValue);
+        h2d_recoTau_[idName + "_pt"]->Fill(idRawValue, recoTaus->at(itau).pt());
+        h2d_recoTau_[idName + "_eta"]->Fill(idRawValue, recoTaus->at(itau).eta());
+        h2d_recoTau_[idName + "_phi"]->Fill(idRawValue, recoTaus->at(itau).phi());
+        h2d_recoTau_[idName + "_mass"]->Fill(idRawValue, recoTaus->at(itau).mass());
+      }
     }
 
     // Count how many gen taus are matched to the reco tau
@@ -315,14 +333,17 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
       h2d_recoTauMatched_["mass_eta"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).eta());
       h2d_recoTauMatched_["mass_phi"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).phi());
 
-      for (auto const& [container, valid, label] : idInfo) {
-        const double idRawValue = idValue(container, valid, tauRef);
-        const std::string idName = std::string("id") + label;
-        h_recoTauMatched_[idName]->Fill(idRawValue);
-        h2d_recoTauMatched_[idName + "_pt"]->Fill(idRawValue, recoTaus->at(itau).pt());
-        h2d_recoTauMatched_[idName + "_eta"]->Fill(idRawValue, recoTaus->at(itau).eta());
-        h2d_recoTauMatched_[idName + "_phi"]->Fill(idRawValue, recoTaus->at(itau).phi());
-        h2d_recoTauMatched_[idName + "_mass"]->Fill(idRawValue, recoTaus->at(itau).mass());
+      if (plotId) {
+        for (size_t i = 0; i < validRecoTauIDLabels.size(); ++i) {
+          const auto& disc = (*validRecoTauIDs[i])[tauRef];
+          const double idRawValue = disc.rawValues.empty() ? -1. : disc.rawValues[0];
+          const std::string idName = "id" + validRecoTauIDLabels[i];
+          h_recoTauMatched_[idName]->Fill(idRawValue);
+          h2d_recoTauMatched_[idName + "_pt"]->Fill(idRawValue, recoTaus->at(itau).pt());
+          h2d_recoTauMatched_[idName + "_eta"]->Fill(idRawValue, recoTaus->at(itau).eta());
+          h2d_recoTauMatched_[idName + "_phi"]->Fill(idRawValue, recoTaus->at(itau).phi());
+          h2d_recoTauMatched_[idName + "_mass"]->Fill(idRawValue, recoTaus->at(itau).mass());
+        }
       }
 
       if (nGenMatchedToOneReco > 1) {
@@ -337,16 +358,19 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
         h2d_recoTauMultiMatched_["mass_eta"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).eta());
         h2d_recoTauMultiMatched_["mass_phi"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).phi());
 
-        for (auto const& [container, valid, label] : idInfo) {
-          const double idRawValue = idValue(container, valid, tauRef);
-          const std::string idName = std::string("id") + label;
-          h_recoTauMultiMatched_[idName]->Fill(idRawValue);
-          h2d_recoTauMultiMatched_[idName + "_pt"]->Fill(idRawValue, recoTaus->at(itau).pt());
-          h2d_recoTauMultiMatched_[idName + "_eta"]->Fill(idRawValue, recoTaus->at(itau).eta());
-          h2d_recoTauMultiMatched_[idName + "_phi"]->Fill(idRawValue, recoTaus->at(itau).phi());
-          h2d_recoTauMultiMatched_[idName + "_mass"]->Fill(idRawValue, recoTaus->at(itau).mass());
+        if (plotId) {
+          for (size_t i = 0; i < validRecoTauIDLabels.size(); ++i) {
+            const auto& disc = (*validRecoTauIDs[i])[tauRef];
+            const double idRawValue = disc.rawValues.empty() ? -1. : disc.rawValues[0];
+            const std::string idName = "id" + validRecoTauIDLabels[i];
+            h_recoTauMultiMatched_[idName]->Fill(idRawValue);
+            h2d_recoTauMultiMatched_[idName + "_pt"]->Fill(idRawValue, recoTaus->at(itau).pt());
+            h2d_recoTauMultiMatched_[idName + "_eta"]->Fill(idRawValue, recoTaus->at(itau).eta());
+            h2d_recoTauMultiMatched_[idName + "_phi"]->Fill(idRawValue, recoTaus->at(itau).phi());
+            h2d_recoTauMultiMatched_[idName + "_mass"]->Fill(idRawValue, recoTaus->at(itau).mass());
+          }
         }
-        }
+      }
     }
   }
 }
@@ -359,10 +383,14 @@ void TauValidationRECO::fillDescriptions(edm::ConfigurationDescriptions& descrip
   // Default tau validation HLT
   desc.add<edm::InputTag>("genTauCollection", edm::InputTag("tauGenJets"));
   desc.add<edm::InputTag>("recoTauCollection", edm::InputTag("hltHpsPFTauProducer"));
-  desc.add<edm::InputTag>("recoTauIDCollectionVsJet", edm::InputTag("hltHpsPFTauDeepTauProducer:VSjet"));
-  desc.add<edm::InputTag>("recoTauIDCollectionVsE", edm::InputTag("hltHpsPFTauDeepTauProducer:VSe"));
-  desc.add<edm::InputTag>("recoTauIDCollectionVsMu", edm::InputTag("hltHpsPFTauDeepTauProducer:VSmu"));
-  desc.add<std::vector<double>>("cutIDs", std::vector<double>{0.0, 0.0, 0.0});
+  desc.add<std::vector<edm::InputTag>>("recoTauIDCollections", 
+    std::vector<edm::InputTag>{
+      edm::InputTag("hltHpsPFTauDeepTauProducer:VSjet"),
+      edm::InputTag("hltHpsPFTauDeepTauProducer:VSe"),
+      edm::InputTag("hltHpsPFTauDeepTauProducer:VSmu")
+    });
+  desc.add<std::vector<double>>("cutIDs_raw", std::vector<double>{0.0, 0.0, 0.0});
+  desc.add<std::vector<int>>("cutIDs_wp", std::vector<int>{-1, -1, -1});
   desc.add<double>("minDeltaR", 0.3);
   desc.add<std::string>("outFolder", "HLT/Tau/TauValidation");
   desc.addUntracked<bool>("isHLT", true);

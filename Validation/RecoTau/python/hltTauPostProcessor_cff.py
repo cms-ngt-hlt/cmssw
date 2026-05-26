@@ -2,7 +2,10 @@ import FWCore.ParameterSet.Config as cms
 from DQMServices.Core.DQMEDHarvester import DQMEDHarvester
 
 hltTauPostProcessor = DQMEDHarvester("DQMGenericClient",
-    subDirs=cms.untracked.vstring("HLT/Tau/TauValidation/", "HLT/Tau/TauValidation_DeltaR/*"),
+    subDirs=cms.untracked.vstring("HLT/Tau/TauValidation/", 
+                                  "HLT/Tau/TauValidation/Cut*",
+                                  "HLT/Tau/TauValidation_DeltaR/DeltaR*",
+                                  "HLT/Tau/TauValidation_DeltaR/DeltaR*/Cut*", ),
     efficiency = cms.vstring( # [TOD] add 2D efficiency
     ),
     efficiencyProfile = cms.untracked.vstring( # for smoother rebinning
@@ -16,22 +19,22 @@ hltTauPostProcessor = DQMEDHarvester("DQMGenericClient",
         "Fake_vs_phi 'Fake Rate vs #phi' recoTauMatched_phi recoTau_phi fake",
         "Fake_vs_pt 'Fake Rate vs p_{T}' recoTauMatched_pt recoTau_pt fake",
         "Fake_vs_mass 'Fake Rate vs mass' recoTauMatched_mass recoTau_mass fake",
-        "Fake_vs_idJet 'Fake Rate vs ID vs Jet' recoTauMatched_idJet recoTau_idJet fake",
-        "Fake_vs_idE 'Fake Rate vs ID vs E' recoTauMatched_idE recoTau_idE fake",
-        "Fake_vs_idMu 'Fake Rate vs ID vs Mu' recoTauMatched_idMu recoTau_idMu fake",
-        # Duplicate rate
-        "Dup_vs_eta 'Duplicate Rate vs #eta' recoTauMultiMatched_eta recoTau_eta",
-        "Dup_vs_phi 'Duplicate Rate vs #phi' recoTauMultiMatched_phi recoTau_phi",
-        "Dup_vs_pt 'Duplicate Rate vs p_{T}' recoTauMultiMatched_pt recoTau_pt",
-        "Dup_vs_mass 'Duplicate Rate vs mass' recoTauMultiMatched_mass recoTau_mass",
-        "Dup_vs_idJet 'Duplicate Rate vs ID vs Jet' recoTauMultiMatched_idJet recoTau_idJet",
-        "Dup_vs_idE 'Duplicate Rate vs ID vs E' recoTauMultiMatched_idE recoTau_idE",
-        "Dup_vs_idMu 'Duplicate Rate vs ID vs Mu' recoTauMultiMatched_idMu recoTau_idMu",
+        "Fake_vs_idVSjet 'Fake Rate vs ID vs Jet' recoTauMatched_idVSjet recoTau_idVSjet fake",
+        "Fake_vs_idVSe 'Fake Rate vs ID vs E' recoTauMatched_idVSe recoTau_idVSe fake",
+        "Fake_vs_idVSmu 'Fake Rate vs ID vs Mu' recoTauMatched_idVSmu recoTau_idVSmu fake",
         # Split rate
         "Split_vs_eta 'Split Rate vs #eta' genTauMultiMatched_eta genTau_eta",
         "Split_vs_phi 'Split Rate vs #phi' genTauMultiMatched_phi genTau_phi",
         "Split_vs_pt 'Split Rate vs p_{T}' genTauMultiMatched_pt genTau_pt",
         "Split_vs_mass 'Split Rate vs mass' genTauMultiMatched_mass genTau_mass",
+        # Duplicate rate
+        "Dup_vs_eta 'Duplicate Rate vs #eta' recoTauMultiMatched_eta recoTau_eta",
+        "Dup_vs_phi 'Duplicate Rate vs #phi' recoTauMultiMatched_phi recoTau_phi",
+        "Dup_vs_pt 'Duplicate Rate vs p_{T}' recoTauMultiMatched_pt recoTau_pt",
+        "Dup_vs_mass 'Duplicate Rate vs mass' recoTauMultiMatched_mass recoTau_mass",
+        "Dup_vs_idVSjet 'Duplicate Rate vs ID vs Jet' recoTauMultiMatched_idVSjet recoTau_idVSjet",
+        "Dup_vs_idVSe 'Duplicate Rate vs ID vs E' recoTauMultiMatched_idVSe recoTau_idVSe",
+        "Dup_vs_idVSmu 'Duplicate Rate vs ID vs Mu' recoTauMultiMatched_idVSmu recoTau_idVSmu",
     ),
     resolution = cms.vstring(),
     resolutionProfile = cms.untracked.vstring(

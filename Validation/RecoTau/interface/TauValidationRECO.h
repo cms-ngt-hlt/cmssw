@@ -4,15 +4,14 @@
 // Analyzer for validation histograms for tau objects at HLT/RECO
 // E. Vernazza Apr. 10, 2026
 
-#include <cmath>
 #include <string>
-#include <string_view>
+// #include <string_view>
 #include <vector>
 #include <tuple>
 #include <unordered_map>
-#include <array>
-#include <sstream>
-#include <iomanip>
+// #include <array>
+// #include <sstream>
+// #include <iomanip>
 
 #include "DQMServices/Core/interface/DQMStore.h"
 #include "DataFormats/Common/interface/Handle.h"
@@ -37,30 +36,23 @@ public:
   void bookHistograms(DQMStore::IBooker &, edm::Run const &, edm::EventSetup const &) override;
   static void fillDescriptions(edm::ConfigurationDescriptions &descriptions);
   std::string convertId(double cut);
-  bool passIdCut(const reco::PFTauRef& tauRef, const std::vector<double> &cutIDs,
-                 const reco::TauDiscriminatorContainer* recoTauIDjet,
-                 const reco::TauDiscriminatorContainer* recoTauIDe,
-                 const reco::TauDiscriminatorContainer* recoTauIDmu);
+  bool passIdCut(const reco::PFTauRef& tauRef,
+                const std::vector<const reco::TauDiscriminatorContainer*>& validRecoTauIDs,
+                const std::vector<double>& validCutIDs_raw, const std::vector<int>& validCutIDs_wp,
+                bool use_raw, bool use_wp);
 
 private:
 
   edm::EDGetTokenT<reco::GenJetCollection> genTauToken_;
   edm::EDGetTokenT<reco::PFTauCollection> recoTauToken_;
-  edm::EDGetTokenT<reco::TauDiscriminatorContainer> recoTauIDjetToken_;
-  edm::EDGetTokenT<reco::TauDiscriminatorContainer> recoTauIDeToken_;
-  edm::EDGetTokenT<reco::TauDiscriminatorContainer> recoTauIDmuToken_;
+  std::vector<edm::EDGetTokenT<reco::TauDiscriminatorContainer>> recoTauIDTokens_;
+  std::vector<std::string> recoTauIDLabels_;
 
   const std::unordered_map<std::string, std::tuple<unsigned, float, float>> histoVars = {
     {"pt", std::make_tuple(200, 0., 1000.)},
     {"eta", std::make_tuple(60, -4.0, 4.0)},
     {"phi", std::make_tuple(50, -3.5, 3.5)},
     {"mass", std::make_tuple(200, 0, 10.)},
-  };
-
-  const std::unordered_map<std::string, std::tuple<unsigned, float, float>> histoVarsReco = {
-    {"idJet", std::make_tuple(50, 0., 1.)},
-    {"idE", std::make_tuple(50, 0., 1.)},
-    {"idMu", std::make_tuple(50, 0., 1.)},
   };
 
   const std::unordered_map<std::string, std::tuple<unsigned, float, float, unsigned, float, float>> histoVars2D = {
@@ -71,20 +63,6 @@ private:
     {"mass_phi", std::make_tuple(200, 0., 10., 50, -3.5, 3.5)},
   };
 
-  const std::unordered_map<std::string, std::tuple<unsigned, float, float, unsigned, float, float>> histoVarsReco2D = {
-    {"idJet_pt", std::make_tuple(50, 0., 1., 200, 0., 1000.)},
-    {"idE_pt", std::make_tuple(50, 0., 1., 200, 0., 1000.)},
-    {"idMu_pt", std::make_tuple(50, 0., 1., 200, 0., 1000.)},
-    {"idJet_mass", std::make_tuple(50, 0., 1., 200, 0., 10.)},
-    {"idE_mass", std::make_tuple(50, 0., 1., 200, 0., 10.)},
-    {"idMu_mass", std::make_tuple(50, 0., 1., 200, 0., 10.)},
-    {"idJet_eta", std::make_tuple(50, 0., 1., 60, -4.0, 4.0)},
-    {"idE_eta", std::make_tuple(50, 0., 1., 60, -4.0, 4.0)},
-    {"idMu_eta", std::make_tuple(50, 0., 1., 60, -4.0, 4.0)},
-    {"idJet_phi", std::make_tuple(50, 0., 1., 50, -3.5, 3.5)},
-    {"idE_phi", std::make_tuple(50, 0., 1., 50, -3.5, 3.5)},
-    {"idMu_phi", std::make_tuple(50, 0., 1., 50, -3.5, 3.5)},
-  };
 
   using UMap = std::unordered_map<std::string, MonitorElement*>;
   UMap h_recoTau_;
@@ -102,8 +80,11 @@ private:
   UMap h2d_responsePt_;
   UMap h2d_responseMass_;
 
-  std::vector<double> cutIDs;
-  bool applyIdCuts;
+  std::vector<int> cutIDs_wp;  // Working-point indices (WP mode)
+  bool use_wp;
+  std::vector<double> cutIDs_raw;    // Raw discriminator value cuts (raw mode)
+  bool use_raw;
+
   bool isHLT;
   float matchingDeltaR;
   std::string outFolder;

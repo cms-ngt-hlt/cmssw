@@ -5,6 +5,9 @@ from Validation.RecoTau.TauValidationRECO import TauValidationRECO as _TauValida
 recoTauValidation = _TauValidationRECO(
     recoTauCollection = "hpsPFTauProducer",
     genTauCollection = "tauGenJetsSelectorAllHadrons", # only GenTaus decaying hadronically
+    recoTauIDCollections = [],
+    cutIDs_wp = [], # WP discriminator (disabled if < 0)
+    cutIDs_raw = [], # raw discriminator value cuts (disabled if 0.0)
     minDeltaR = 0.3,
     outFolder = "Tau/TauValidation",
     isHLT = False
