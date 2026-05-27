@@ -48,16 +48,16 @@ class DQMPlotter:
         self.ratio_height = ratio_height
         # Color palette from https://cms-analysis.docs.cern.ch/guidelines/plotting/colors/
         self.colors = [
-            "#3f8fda",
-            "#ffa90e",
-            "#bd1f01",
-            "#94a4a2",
             "#832db6",
+            "#3f8fda",
             "#a96b59",
+            "#ffa90e",
             "#e76300",
+            "#bd1f01",
             "#b9ac70",
             "#717581",
             "#92dadd",
+            "#94a4a2",
         ]
         self.markers = [
             "o",  # circle
@@ -418,7 +418,7 @@ class DQMPlotter:
 
         legend_columns = len(wrapped_labels) if len(wrapped_labels) <= 3 else 3
         legend_fontsize = "20"
-        if len(wrapped_labels) > 6:
+        if len(wrapped_labels) > 3:
             legend_fontsize = "18"
         if len(wrapped_labels) > 10:
             legend_fontsize = "16"

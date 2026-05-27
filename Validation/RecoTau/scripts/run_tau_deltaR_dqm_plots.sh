@@ -44,13 +44,12 @@ case "$mode_upper" in
 esac
 
 # Change label according to the input file used
-ENERGY_TEXT="Ten Tau (200 PU) | 13.6 TeV"
+ENERGY_TEXT="Ten Tau (150 PU) | 14 TeV"
 
 DQM_FILE="DQM_V0001_R000000001__Global__CMSSW_X_Y_Z__RECO.root"
 SCRIPT_DIR="${CMSSW_BASE}/src/Validation/RecoTau/scripts"
 
 MAKE_COMPARISON="${SCRIPT_DIR}/makeComparisonPlots.py"
-MAKE_TAU_VALIDATION="${SCRIPT_DIR}/makeTauValidationPlots.py"
 
 OUTDIR_COMPARISON="TauValidationPlots/Comparison_DeltaR_$mode_upper"
 
