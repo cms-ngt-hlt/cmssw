@@ -616,7 +616,7 @@ class DQMPlotter:
             out.SetBinError(ibin, err)
         return out
 
-    def plot_counts_and_rate(self, denominator, numerator, rate, output_path, denominator_label, numerator_label, rate_label, xlabel, ylabel_rate, cms_text="Preliminary", energy_text="", right_ylim=(0.0, 1.25), right_log=False, text=None):
+    def plot_counts_and_rate(self, denominator, numerator, rate, output_path, denominator_label, numerator_label, rate_label, xlabel, ylabel_rate, cms_text="Preliminary", energy_text="", xlim=(None, None), right_ylim=(0.0, 1.25), right_log=False, text=None, leg_title=""):
         centres, rate_values, rate_errors, edges, _, _ = self.root_to_numpy(rate)
         _, den_values, den_errors, _, _, _ = self.root_to_numpy(denominator)
         _, num_values, num_errors, _, _, _ = self.root_to_numpy(numerator)
@@ -633,27 +633,36 @@ class DQMPlotter:
         ax.step(edges, num_step, where="post", label=numerator_label, color="#9c9ca1", linestyle="-.", linewidth=2)
         ax.fill_between(edges, num_step, step="post", alpha=0.3, color="#9c9ca1")
 
-        print("last den:", den_values[-1], "last num:", num_values[-1], "last rate:", rate_values[-1], "last edges:", edges[-2], edges[-1])
+        # print("last den:", den_values[-1], "last num:", num_values[-1], "last rate:", rate_values[-1], "last edges:", edges[-2], edges[-1])
 
         # Set an automatic ymax based on the max value + the up error
         counts_upper = np.concatenate([den_values + den_errors, num_values + num_errors])
-        ymax = 1.6 * np.max(counts_upper) if len(counts_upper) and np.max(counts_upper) > 0 else 1.0
+        ymax = 1.2 * np.max(counts_upper) if len(counts_upper) and np.max(counts_upper) > 0 else 1.0
         rate_upper = rate_values + rate_errors
         rate_ymax = 1.25 * np.max(rate_upper) if len(rate_upper) and np.max(rate_upper) > 0 else right_ylim[1]
 
+        if xlim[0] is not None and xlim[1] is not None:
+            ax.set_xlim(xlim)
         ax.set_ylim(0.0, ymax)
         ax.set_xlabel(xlabel, fontsize=20)
-        ax.set_ylabel("# Taus", fontsize=20)
-        ax.legend(loc="upper left", frameon=False, fontsize=16)
+        ax.set_ylabel("Entries", fontsize=20)
+        leg = ax.legend(loc="upper left", frameon=False, fontsize=18, title=leg_title, title_fontsize=18,
+                           borderaxespad=0.5, handletextpad=0.8)
+        leg._legend_box.align = "left"
+        leg.get_title().set_ha("left")
 
         ax2 = ax.twinx()
         ax2.set_ylabel(ylabel_rate, color="#bd1f01", fontsize=20)
-        ax2.set_ylim(right_ylim[0], rate_ymax)
+        if right_ylim[0] is not None and right_ylim[1] is not None:
+            ax2.set_ylim(right_ylim)
+        else:
+            ax2.set_ylim(0.0, rate_ymax)
 
         if right_log:
             ax2.set_yscale("log")
 
         ax2.errorbar(centres, rate_values, xerr=0.5 * widths, yerr=rate_errors, fmt="o", color="#bd1f01", capsize=2, linewidth=1.5, label=rate_label)
+        # ax2.axhline(y=1.0, color="#bd1f01", linewidth=2, linestyle="--", alpha=0.7)
 
         ax.grid(True, axis="x", alpha=0.7, linestyle="dashdot")
         ax2.grid(True, axis="y", alpha=0.7, linestyle="dashdot")
@@ -711,5 +720,5 @@ def plot_comparison(histograms, labels, output_path, xlabel=None, ylabel=None, x
     return _default_plotter.plot_comparison(histograms, labels, output_path, x_lim=xlim or [None, None], y_lim=ylim or [None, None], y_lim_ratio=ylim_ratio or [None, None], xlabel=xlabel, ylabel=ylabel, leg_title=leg_title, logx=logx, logy=logy, cms_text=cms_text, energy_text=energy_text)
 
 
-def plot_counts_and_rate(denominator, numerator, rate, output_path, denominator_label, numerator_label, rate_label, xlabel, ylabel_rate, cms_text="Preliminary", energy_text="", right_ylim=(0.0, 1.25), right_log=False, text=None):
-    return _default_plotter.plot_counts_and_rate(denominator, numerator, rate, output_path, denominator_label, numerator_label, rate_label, xlabel, ylabel_rate, cms_text, energy_text, right_ylim, right_log, text)
+def plot_counts_and_rate(denominator, numerator, rate, output_path, denominator_label, numerator_label, rate_label, xlabel, ylabel_rate, cms_text="Preliminary", energy_text="", xlim=(None, None), right_ylim=(0.0, 1.25), right_log=False, text=None, leg_title=""):
+    return _default_plotter.plot_counts_and_rate(denominator, numerator, rate, output_path, denominator_label, numerator_label, rate_label, xlabel, ylabel_rate, cms_text, energy_text, xlim, right_ylim, right_log, text, leg_title)

@@ -89,9 +89,11 @@ def make_summary_plot(args):
             ylabel_rate=args.ylabel,
             cms_text=args.cms_text,
             energy_text=args.energy_text,
+            xlim=parse_limits(args.xlim),
             right_ylim=parse_limits(args.ylim),
             right_log=args.logy,
             text=args.text,
+            leg_title=args.leg_title,
         )
 
         made_any = True
@@ -151,6 +153,7 @@ def make_response_plot(args):
         logy=args.logy,
         cms_text=args.cms_text,
         energy_text=args.energy_text,
+        leg_title=args.leg_title,
     )
 
     return True
@@ -190,6 +193,7 @@ def main():
     parser.add_argument("--cms-text", type=str, default="Preliminary", help="CMS label text, e.g. 'Preliminary', 'Simulation' or an empty string.")
     parser.add_argument("--energy-text", type=str, default="", help="Additional CMS energy/luminosity text.")
     parser.add_argument("--text", type=str, default=None, help="Additional annotation text drawn on the plot.")
+    parser.add_argument("--leg-title", type=str, default="", help="Title for the legend.")
 
     args = parser.parse_args()
 
