@@ -21,6 +21,7 @@
 #include "FWCore/ParameterSet/interface/ConfigurationDescriptions.h"
 #include <DQMServices/Core/interface/DQMEDAnalyzer.h>
 #include "DataFormats/TauReco/interface/PFTau.h"
+#include "DataFormats/PatCandidates/interface/Tau.h"
 #include "DataFormats/JetReco/interface/GenJetCollection.h"
 #include "PhysicsTools/JetMCUtils/interface/JetMCTag.h"
 #include "DataFormats/TauReco/interface/TauDiscriminatorContainer.h"
@@ -36,8 +37,7 @@ public:
   void bookHistograms(DQMStore::IBooker &, edm::Run const &, edm::EventSetup const &) override;
   static void fillDescriptions(edm::ConfigurationDescriptions &descriptions);
   std::string convertId(double cut);
-  bool passIdCut(const reco::PFTauRef& tauRef,
-                const std::vector<const reco::TauDiscriminatorContainer*>& validRecoTauIDs,
+  bool passIdCut(const std::vector<double> idValuesForTau, const std::vector<std::vector<bool>> wpValuesForTau,
                 const std::vector<double>& validCutIDs_raw, const std::vector<int>& validCutIDs_wp,
                 bool use_raw, bool use_wp);
 
@@ -45,8 +45,10 @@ private:
 
   edm::EDGetTokenT<reco::GenJetCollection> genTauToken_;
   edm::EDGetTokenT<reco::PFTauCollection> recoTauToken_;
+  edm::EDGetTokenT<pat::TauCollection> patTauToken_;
   std::vector<edm::EDGetTokenT<reco::TauDiscriminatorContainer>> recoTauIDTokens_;
   std::vector<std::string> recoTauIDLabels_;
+  edm::InputTag recoTauCollection;
 
   const std::unordered_map<std::string, std::tuple<unsigned, float, float>> histoVars = {
     {"pt", std::make_tuple(200, 0., 1000.)},
@@ -85,7 +87,7 @@ private:
   std::vector<double> cutIDs_raw;    // Raw discriminator value cuts (raw mode)
   bool use_raw;
 
-  bool isHLT;
+  bool isPatTaus;
   float matchingDeltaR;
   std::string outFolder;
 

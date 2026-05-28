@@ -10,7 +10,7 @@ hltTauValidation = _TauValidationRECO(
     cutIDs_raw = [0.0, 0.0, 0.0], # raw discriminator value cuts (disabled if 0.0)
     minDeltaR = 0.3,
     outFolder = "HLT/Tau/TauValidation",
-    isHLT = True
+    isPatTaus = False
 )
 
 hltTauValidation_cutWPVsJet_0 = hltTauValidation.clone(cutIDs_wp = [0, -1, -1])

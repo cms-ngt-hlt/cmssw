@@ -5,6 +5,7 @@
 #include "FWCore/Framework/interface/MakerMacros.h"
 
 #include <cstddef>
+#include <iterator>
 #include <sstream>
 #include <iomanip>
 #include <cmath>
@@ -25,45 +26,49 @@ std::string TauValidationRECO::convertId(double cut) {
   return result;
 }
 
-bool TauValidationRECO::passIdCut(const reco::PFTauRef& tauRef,
-                                  const std::vector<const reco::TauDiscriminatorContainer*>& validRecoTauIDs,
+bool TauValidationRECO::passIdCut(const std::vector<double> idValuesForTau, const std::vector<std::vector<bool>> wpValuesForTau, 
                                   const std::vector<double>& validCutIDs_raw, const std::vector<int>& validCutIDs_wp,
                                   bool use_raw, bool use_wp) {
 
   if (use_raw) {
-    for (size_t i = 0; i < validRecoTauIDs.size(); ++i) {
-      const auto& disc = (*validRecoTauIDs[i])[tauRef];
-      if (validCutIDs_raw[i] != 0.0) {
-        if (disc.rawValues.empty() || disc.rawValues[0] <= validCutIDs_raw[i]) {
-          return false;
+    for (size_t i = 0; i < idValuesForTau.size(); ++i) {
+      if (validCutIDs_raw[i] > 0.0) {
+        if (idValuesForTau[i] < validCutIDs_raw[i]) {
+          return false; // Fails raw cut
         }
       }
     }
-    return true; // Passes all raw cuts
   }
 
   if (use_wp) {
-    for (size_t i = 0; i < validRecoTauIDs.size(); ++i) {
-      const auto& disc = (*validRecoTauIDs[i])[tauRef];
+    for (size_t i = 0; i < wpValuesForTau.size(); ++i) {
       if (validCutIDs_wp[i] >= 0) {
-        if (disc.workingPoints.size() <= static_cast<size_t>(validCutIDs_wp[i]) || !disc.workingPoints[validCutIDs_wp[i]]) {
+        if (validCutIDs_wp[i] > static_cast<int>(wpValuesForTau[i].size())) {
           return false;
+        }
+        if (wpValuesForTau[i][validCutIDs_wp[i]] == 0) {
+          return false; // Fails WP cut
         }
       }
     }
-    return true; // Passes all WP cuts
   }
 
-  return true; // If no cuts specified, pass by default
+  return true;
 
 }
 
 TauValidationRECO::TauValidationRECO(const edm::ParameterSet& iConfig) {
   genTauToken_ = consumes<reco::GenJetCollection>(iConfig.getParameter<edm::InputTag>("genTauCollection"));
-  recoTauToken_ = consumes<reco::PFTauCollection>(iConfig.getParameter<edm::InputTag>("recoTauCollection"));
+  recoTauCollection = iConfig.getParameter<edm::InputTag>("recoTauCollection");
   matchingDeltaR = iConfig.getParameter<double>("minDeltaR");
   outFolder = iConfig.getParameter<std::string>("outFolder");
-  isHLT = iConfig.getUntrackedParameter<bool>("isHLT");
+  isPatTaus = iConfig.getUntrackedParameter<bool>("isPatTaus");
+
+  if (isPatTaus) {
+    patTauToken_ = consumes<pat::TauCollection>(recoTauCollection);
+  } else {
+    recoTauToken_ = consumes<reco::PFTauCollection>(recoTauCollection);
+  }
 
   std::vector<edm::InputTag> idTags = iConfig.getParameter<std::vector<edm::InputTag>>("recoTauIDCollections");
   for (const auto& tag : idTags) {
@@ -83,12 +88,12 @@ TauValidationRECO::TauValidationRECO(const edm::ParameterSet& iConfig) {
   }
 
   if (!recoTauIDLabels_.empty()) {
-    if ((use_wp) && (cutIDs_wp.size() != recoTauIDLabels_.size())) {
+    if (cutIDs_wp.size() != recoTauIDLabels_.size()) {
       cutIDs_wp.resize(recoTauIDLabels_.size(), -1);
       edm::LogPrint("TauValidationRECO") << "Warning: cutIDs_wp size (" << cutIDs_wp.size() 
         << ") adjusted to match idLabels size (" << recoTauIDLabels_.size() << ")";
     }
-    if ((use_raw) && (cutIDs_raw.size() != recoTauIDLabels_.size())) {
+    if (cutIDs_raw.size() != recoTauIDLabels_.size()) {
       cutIDs_raw.resize(recoTauIDLabels_.size(), 0.0);
       edm::LogPrint("TauValidationRECO") << "Warning: cutIDs_raw size (" << cutIDs_raw.size() 
         << ") adjusted to match idLabels size (" << recoTauIDLabels_.size() << ")";
@@ -174,13 +179,7 @@ TauValidationRECO::~TauValidationRECO() {}
 //------------------------------------------------------------------------------
 void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup& mSetup) {
 
-  edm::Handle<reco::PFTauCollection> recoTaus;
-  mEvent.getByToken(recoTauToken_, recoTaus);
-  if (!recoTaus.isValid()) {
-    edm::LogPrint("TauValidationRECO") << " Reco Tau collection not found while running TauValidationRECO.cc ";
-    return;
-  }
-  // std::cout << "Number of reco taus: " << recoTaus->size() << std::endl; // [DEBUG]
+  // --------------------------------- Gen Taus --------------------------------
 
   edm::Handle<reco::GenJetCollection> genTaus;
   mEvent.getByToken(genTauToken_, genTaus);
@@ -188,7 +187,10 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
     edm::LogPrint("TauValidationRECO") << " Gen Tau collection not found while running TauValidationRECO.cc ";
     return;
   }
+
   // std::cout << "Number of gen taus: " << genTaus->size() << std::endl; // [DEBUG]
+
+  // --------------------------------- Tau IDs --------------------------------
 
   std::vector<const reco::TauDiscriminatorContainer*> validRecoTauIDs;
   std::vector<std::string> validRecoTauIDLabels;
@@ -210,6 +212,69 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
   bool plotId = validRecoTauIDs.size() > 0;
   bool applyIdCuts = plotId && (use_wp || use_raw);
 
+  // --------------------------------- Reco Taus --------------------------------
+
+  std::vector<reco::PFTau> recoTaus;
+  std::vector<std::vector<double>> recoTauIDValues;
+  std::vector<std::vector<std::vector<bool>>> recoTauWPValues;
+
+  if (!isPatTaus) {
+    edm::Handle<reco::PFTauCollection> recoTausTmp;
+    mEvent.getByToken(recoTauToken_, recoTausTmp);
+    if (!recoTausTmp.isValid()) {
+      edm::LogPrint("TauValidationRECO") << " Reco Tau collection not found while running TauValidationRECO.cc ";
+      return;
+    }
+    for (unsigned itau = 0; itau < recoTausTmp->size(); ++itau) {
+      std::vector<double> idValuesForTau;
+      std::vector<std::vector<bool>> wpValuesForTau;
+      for (size_t i = 0; i < validRecoTauIDs.size(); ++i) {
+        reco::PFTauRef tauRef = reco::PFTauRef(recoTausTmp, itau);
+        edm::Handle<reco::TauDiscriminatorContainer> recoTauID;
+        const auto& disc = (*validRecoTauIDs[i])[tauRef];
+        idValuesForTau.push_back(disc.rawValues.empty() ? -1.0 : disc.rawValues[0]);
+        wpValuesForTau.push_back(disc.workingPoints.empty() ? std::vector<bool>(1, false) : disc.workingPoints);
+      }
+      if (applyIdCuts && !passIdCut(idValuesForTau, wpValuesForTau, validCutIDs_raw, validCutIDs_wp, use_raw, use_wp)) {
+        continue;
+      }
+      recoTauIDValues.push_back(idValuesForTau);
+      recoTauWPValues.push_back(wpValuesForTau);
+      recoTaus.push_back(recoTausTmp->at(itau));
+    }
+  }
+  else {
+    edm::Handle<pat::TauCollection> patTaus;
+    mEvent.getByToken(patTauToken_, patTaus);
+    if (!patTaus.isValid()) {
+      edm::LogPrint("TauValidationRECO") << " PAT Tau collection not found while running TauValidationRECO.cc ";
+      return;
+    }
+    for (unsigned itau = 0; itau < patTaus->size(); ++itau) {
+      reco::PFTau tauFromPat;
+      tauFromPat.setP4(patTaus->at(itau).p4());
+      std::vector<double> idValuesForTau;
+      std::vector<std::vector<bool>> wpValuesForTau;
+      for (size_t i = 0; i < validRecoTauIDs.size(); ++i) {
+        pat::TauRef tauRef = pat::TauRef(patTaus, itau);
+        edm::Handle<reco::TauDiscriminatorContainer> recoTauID;
+        const auto& disc = (*validRecoTauIDs[i])[tauRef];
+        idValuesForTau.push_back(disc.rawValues.empty() ? -1.0 : disc.rawValues[0]);
+        wpValuesForTau.push_back(disc.workingPoints.empty() ? std::vector<bool>(1, false) : disc.workingPoints);
+      }
+      if (applyIdCuts && !passIdCut(idValuesForTau, wpValuesForTau, validCutIDs_raw, validCutIDs_wp, use_raw, use_wp)) {
+        continue;
+      }
+      recoTauIDValues.push_back(idValuesForTau);
+      recoTauWPValues.push_back(wpValuesForTau);
+      recoTaus.push_back(tauFromPat);
+    }
+  }
+
+  // std::cout << "Number of reco taus: " << recoTaus.size() << std::endl; // [DEBUG]
+
+  // --------------------------------- Compute Metrics --------------------------------
+
   // Loop for efficiency 
   for (uint itau = 0; itau < genTaus->size(); ++itau) {
     
@@ -228,18 +293,14 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
     float bestDeltaR = 999.;
     float ResponsePt_bestDeltaR = 0.;
     float ResponseMass_bestDeltaR = 0.;
-    for (uint jtau = 0; jtau < recoTaus->size(); ++jtau) {
-      reco::PFTauRef tauRef(recoTaus, jtau);
-      if (applyIdCuts && !passIdCut(tauRef, validRecoTauIDs, validCutIDs_raw, validCutIDs_wp, use_raw, use_wp)) {
-        continue; // skip if tau doesn't pass ID cuts
-      }
-      float deltaRValue = deltaR(genTaus->at(itau), recoTaus->at(jtau));
+    for (uint jtau = 0; jtau < recoTaus.size(); ++jtau) {
+      float deltaRValue = deltaR(genTaus->at(itau), recoTaus.at(jtau));
       if (deltaRValue < matchingDeltaR) {
         nRecoMatchedToOneGen++;
         if (deltaRValue < bestDeltaR) {
           bestDeltaR = deltaRValue;
-          ResponsePt_bestDeltaR = recoTaus->at(jtau).pt() / genTaus->at(itau).pt();
-          ResponseMass_bestDeltaR = recoTaus->at(jtau).mass() / genTaus->at(itau).mass();
+          ResponsePt_bestDeltaR = recoTaus.at(jtau).pt() / genTaus->at(itau).pt();
+          ResponseMass_bestDeltaR = recoTaus.at(jtau).mass() / genTaus->at(itau).mass();
         }
       }
     }
@@ -282,40 +343,34 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
   }
 
   // Loop for fake rate 
-  for (uint itau = 0; itau < recoTaus->size(); ++itau) {
-    reco::PFTauRef tauRef(recoTaus, itau);
+  for (uint itau = 0; itau < recoTaus.size(); ++itau) {
 
-    if (applyIdCuts && !passIdCut(tauRef, validRecoTauIDs, validCutIDs_raw, validCutIDs_wp, use_raw, use_wp)) {
-      continue; // skip if tau doesn't pass ID cuts
-    }
-
-    h_recoTau_["pt"]->Fill(recoTaus->at(itau).pt());
-    h_recoTau_["eta"]->Fill(recoTaus->at(itau).eta());
-    h_recoTau_["phi"]->Fill(recoTaus->at(itau).phi());
-    h_recoTau_["mass"]->Fill(recoTaus->at(itau).mass());
-    h2d_recoTau_["pt_eta"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).eta());
-    h2d_recoTau_["pt_phi"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).phi());
-    h2d_recoTau_["pt_mass"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).mass());
-    h2d_recoTau_["mass_eta"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).eta());
-    h2d_recoTau_["mass_phi"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).phi());
+    h_recoTau_["pt"]->Fill(recoTaus.at(itau).pt());
+    h_recoTau_["eta"]->Fill(recoTaus.at(itau).eta());
+    h_recoTau_["phi"]->Fill(recoTaus.at(itau).phi());
+    h_recoTau_["mass"]->Fill(recoTaus.at(itau).mass());
+    h2d_recoTau_["pt_eta"]->Fill(recoTaus.at(itau).pt(), recoTaus.at(itau).eta());
+    h2d_recoTau_["pt_phi"]->Fill(recoTaus.at(itau).pt(), recoTaus.at(itau).phi());
+    h2d_recoTau_["pt_mass"]->Fill(recoTaus.at(itau).pt(), recoTaus.at(itau).mass());
+    h2d_recoTau_["mass_eta"]->Fill(recoTaus.at(itau).mass(), recoTaus.at(itau).eta());
+    h2d_recoTau_["mass_phi"]->Fill(recoTaus.at(itau).mass(), recoTaus.at(itau).phi());
 
     if (plotId) {
       for (size_t i = 0; i < validRecoTauIDLabels.size(); ++i) {
-        const auto& disc = (*validRecoTauIDs[i])[tauRef];
-        const double idRawValue = disc.rawValues.empty() ? -1. : disc.rawValues[0];
+        const double idRawValue = recoTauIDValues[itau][i];
         const std::string idName = "id" + validRecoTauIDLabels[i];
         h_recoTau_[idName]->Fill(idRawValue);
-        h2d_recoTau_[idName + "_pt"]->Fill(idRawValue, recoTaus->at(itau).pt());
-        h2d_recoTau_[idName + "_eta"]->Fill(idRawValue, recoTaus->at(itau).eta());
-        h2d_recoTau_[idName + "_phi"]->Fill(idRawValue, recoTaus->at(itau).phi());
-        h2d_recoTau_[idName + "_mass"]->Fill(idRawValue, recoTaus->at(itau).mass());
+        h2d_recoTau_[idName + "_pt"]->Fill(idRawValue, recoTaus.at(itau).pt());
+        h2d_recoTau_[idName + "_eta"]->Fill(idRawValue, recoTaus.at(itau).eta());
+        h2d_recoTau_[idName + "_phi"]->Fill(idRawValue, recoTaus.at(itau).phi());
+        h2d_recoTau_[idName + "_mass"]->Fill(idRawValue, recoTaus.at(itau).mass());
       }
     }
 
     // Count how many gen taus are matched to the reco tau
     int nGenMatchedToOneReco = 0;
     for (uint jtau = 0; jtau < genTaus->size(); ++jtau) {
-      if (deltaR(genTaus->at(jtau), recoTaus->at(itau)) < matchingDeltaR) {
+      if (deltaR(genTaus->at(jtau), recoTaus.at(itau)) < matchingDeltaR) {
         nGenMatchedToOneReco++;
       }
     }
@@ -323,51 +378,49 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
     // Fill histograms for reco taus matched to at least one gen tau
     if (nGenMatchedToOneReco > 0) {
       // Fill reco tau histograms for matched taus
-      h_recoTauMatched_["pt"]->Fill(recoTaus->at(itau).pt());
-      h_recoTauMatched_["eta"]->Fill(recoTaus->at(itau).eta());
-      h_recoTauMatched_["phi"]->Fill(recoTaus->at(itau).phi());
-      h_recoTauMatched_["mass"]->Fill(recoTaus->at(itau).mass());
-      h2d_recoTauMatched_["pt_eta"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).eta());
-      h2d_recoTauMatched_["pt_phi"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).phi());
-      h2d_recoTauMatched_["pt_mass"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).mass());
-      h2d_recoTauMatched_["mass_eta"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).eta());
-      h2d_recoTauMatched_["mass_phi"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).phi());
+      h_recoTauMatched_["pt"]->Fill(recoTaus.at(itau).pt());
+      h_recoTauMatched_["eta"]->Fill(recoTaus.at(itau).eta());
+      h_recoTauMatched_["phi"]->Fill(recoTaus.at(itau).phi());
+      h_recoTauMatched_["mass"]->Fill(recoTaus.at(itau).mass());
+      h2d_recoTauMatched_["pt_eta"]->Fill(recoTaus.at(itau).pt(), recoTaus.at(itau).eta());
+      h2d_recoTauMatched_["pt_phi"]->Fill(recoTaus.at(itau).pt(), recoTaus.at(itau).phi());
+      h2d_recoTauMatched_["pt_mass"]->Fill(recoTaus.at(itau).pt(), recoTaus.at(itau).mass());
+      h2d_recoTauMatched_["mass_eta"]->Fill(recoTaus.at(itau).mass(), recoTaus.at(itau).eta());
+      h2d_recoTauMatched_["mass_phi"]->Fill(recoTaus.at(itau).mass(), recoTaus.at(itau).phi());
 
       if (plotId) {
         for (size_t i = 0; i < validRecoTauIDLabels.size(); ++i) {
-          const auto& disc = (*validRecoTauIDs[i])[tauRef];
-          const double idRawValue = disc.rawValues.empty() ? -1. : disc.rawValues[0];
+          const double idRawValue = recoTauIDValues[itau][i];
           const std::string idName = "id" + validRecoTauIDLabels[i];
           h_recoTauMatched_[idName]->Fill(idRawValue);
-          h2d_recoTauMatched_[idName + "_pt"]->Fill(idRawValue, recoTaus->at(itau).pt());
-          h2d_recoTauMatched_[idName + "_eta"]->Fill(idRawValue, recoTaus->at(itau).eta());
-          h2d_recoTauMatched_[idName + "_phi"]->Fill(idRawValue, recoTaus->at(itau).phi());
-          h2d_recoTauMatched_[idName + "_mass"]->Fill(idRawValue, recoTaus->at(itau).mass());
+          h2d_recoTauMatched_[idName + "_pt"]->Fill(idRawValue, recoTaus.at(itau).pt());
+          h2d_recoTauMatched_[idName + "_eta"]->Fill(idRawValue, recoTaus.at(itau).eta());
+          h2d_recoTauMatched_[idName + "_phi"]->Fill(idRawValue, recoTaus.at(itau).phi());
+          h2d_recoTauMatched_[idName + "_mass"]->Fill(idRawValue, recoTaus.at(itau).mass());
         }
       }
 
       if (nGenMatchedToOneReco > 1) {
         // Fill reco tau histograms for multi-matched taus
-        h_recoTauMultiMatched_["pt"]->Fill(recoTaus->at(itau).pt());
-        h_recoTauMultiMatched_["eta"]->Fill(recoTaus->at(itau).eta());
-        h_recoTauMultiMatched_["phi"]->Fill(recoTaus->at(itau).phi());
-        h_recoTauMultiMatched_["mass"]->Fill(recoTaus->at(itau).mass());
-        h2d_recoTauMultiMatched_["pt_eta"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).eta());
-        h2d_recoTauMultiMatched_["pt_phi"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).phi());
-        h2d_recoTauMultiMatched_["pt_mass"]->Fill(recoTaus->at(itau).pt(), recoTaus->at(itau).mass());
-        h2d_recoTauMultiMatched_["mass_eta"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).eta());
-        h2d_recoTauMultiMatched_["mass_phi"]->Fill(recoTaus->at(itau).mass(), recoTaus->at(itau).phi());
+        h_recoTauMultiMatched_["pt"]->Fill(recoTaus.at(itau).pt());
+        h_recoTauMultiMatched_["eta"]->Fill(recoTaus.at(itau).eta());
+        h_recoTauMultiMatched_["phi"]->Fill(recoTaus.at(itau).phi());
+        h_recoTauMultiMatched_["mass"]->Fill(recoTaus.at(itau).mass());
+        h2d_recoTauMultiMatched_["pt_eta"]->Fill(recoTaus.at(itau).pt(), recoTaus.at(itau).eta());
+        h2d_recoTauMultiMatched_["pt_phi"]->Fill(recoTaus.at(itau).pt(), recoTaus.at(itau).phi());
+        h2d_recoTauMultiMatched_["pt_mass"]->Fill(recoTaus.at(itau).pt(), recoTaus.at(itau).mass());
+        h2d_recoTauMultiMatched_["mass_eta"]->Fill(recoTaus.at(itau).mass(), recoTaus.at(itau).eta());
+        h2d_recoTauMultiMatched_["mass_phi"]->Fill(recoTaus.at(itau).mass(), recoTaus.at(itau).phi());
 
         if (plotId) {
           for (size_t i = 0; i < validRecoTauIDLabels.size(); ++i) {
-            const auto& disc = (*validRecoTauIDs[i])[tauRef];
-            const double idRawValue = disc.rawValues.empty() ? -1. : disc.rawValues[0];
+            const double idRawValue = recoTauIDValues[itau][i];
             const std::string idName = "id" + validRecoTauIDLabels[i];
             h_recoTauMultiMatched_[idName]->Fill(idRawValue);
-            h2d_recoTauMultiMatched_[idName + "_pt"]->Fill(idRawValue, recoTaus->at(itau).pt());
-            h2d_recoTauMultiMatched_[idName + "_eta"]->Fill(idRawValue, recoTaus->at(itau).eta());
-            h2d_recoTauMultiMatched_[idName + "_phi"]->Fill(idRawValue, recoTaus->at(itau).phi());
-            h2d_recoTauMultiMatched_[idName + "_mass"]->Fill(idRawValue, recoTaus->at(itau).mass());
+            h2d_recoTauMultiMatched_[idName + "_pt"]->Fill(idRawValue, recoTaus.at(itau).pt());
+            h2d_recoTauMultiMatched_[idName + "_eta"]->Fill(idRawValue, recoTaus.at(itau).eta());
+            h2d_recoTauMultiMatched_[idName + "_phi"]->Fill(idRawValue, recoTaus.at(itau).phi());
+            h2d_recoTauMultiMatched_[idName + "_mass"]->Fill(idRawValue, recoTaus.at(itau).mass());
           }
         }
       }
@@ -393,7 +446,7 @@ void TauValidationRECO::fillDescriptions(edm::ConfigurationDescriptions& descrip
   desc.add<std::vector<int>>("cutIDs_wp", std::vector<int>{-1, -1, -1});
   desc.add<double>("minDeltaR", 0.3);
   desc.add<std::string>("outFolder", "HLT/Tau/TauValidation");
-  desc.addUntracked<bool>("isHLT", true);
+  desc.addUntracked<bool>("isPatTaus", false);
   descriptions.addWithDefaultLabel(desc);
 }
 
