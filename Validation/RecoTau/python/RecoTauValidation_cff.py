@@ -1,8 +1,8 @@
 import FWCore.ParameterSet.Config as cms
 
-from Validation.RecoTau.TauValidationRECO import TauValidationRECO as _TauValidationRECO
+from Validation.RecoTau.TauValidation import TauValidation as _TauValidation
 
-# recoTauValidation = _TauValidationRECO(
+# recoTauValidation = _TauValidation(
 #     recoTauCollection = "hpsPFTauProducer",
 #     genTauCollection = "tauGenJetsSelectorAllHadrons", # only GenTaus decaying hadronically
 #     recoTauIDCollections = [], # reco discriminators not available at RECO level (only at MINI)
@@ -13,7 +13,7 @@ from Validation.RecoTau.TauValidationRECO import TauValidationRECO as _TauValida
 #     isPatTaus = False
 # )
 
-recoTauValidation = _TauValidationRECO(
+recoTauValidation = _TauValidation(
     recoTauCollection = "slimmedTausNoDeepIDs",
     genTauCollection = "tauGenJetsSelectorAllHadrons", # only GenTaus decaying hadronically
     recoTauIDCollections = ["deepTau2026v2p5ForMini:VSjet", "deepTau2026v2p5ForMini:VSe", "deepTau2026v2p5ForMini:VSmu"],

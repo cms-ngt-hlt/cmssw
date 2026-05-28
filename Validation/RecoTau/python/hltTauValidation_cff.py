@@ -1,8 +1,8 @@
 import FWCore.ParameterSet.Config as cms
 
-from Validation.RecoTau.TauValidationRECO import TauValidationRECO as _TauValidationRECO
+from Validation.RecoTau.TauValidation import TauValidation as _TauValidation
 
-hltTauValidation = _TauValidationRECO(
+hltTauValidation = _TauValidation(
     genTauCollection = "tauGenJetsSelectorAllHadrons", # only GenTaus decaying hadronically
     recoTauCollection = "hltHpsPFTauProducer",
     recoTauIDCollections = ["hltHpsPFTauDeepTauProducer:VSjet", "hltHpsPFTauDeepTauProducer:VSe", "hltHpsPFTauDeepTauProducer:VSmu"],

@@ -1,5 +1,5 @@
-#ifndef ValidationRecoTau_TauValidationRECO_h
-#define ValidationRecoTau_TauValidationRECO_h
+#ifndef ValidationRecoTau_TauValidation_h
+#define ValidationRecoTau_TauValidation_h
 
 // Analyzer for validation histograms for tau objects at HLT/RECO
 // E. Vernazza Apr. 10, 2026
@@ -27,11 +27,11 @@
 #include "DataFormats/TauReco/interface/TauDiscriminatorContainer.h"
 #include "DataFormats/Math/interface/deltaR.h"
 
-class TauValidationRECO : public DQMEDAnalyzer {
+class TauValidation : public DQMEDAnalyzer {
 
 public:
-  TauValidationRECO(const edm::ParameterSet &);
-  ~TauValidationRECO() override;
+  TauValidation(const edm::ParameterSet &);
+  ~TauValidation() override;
 
   void analyze(const edm::Event &, const edm::EventSetup &) override;
   void bookHistograms(DQMStore::IBooker &, edm::Run const &, edm::EventSetup const &) override;

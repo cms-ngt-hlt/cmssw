@@ -1,7 +1,7 @@
 // Analyzer for validation histograms for tau objects at HLT/RECO
 // E. Vernazza Apr. 10, 2026
 
-#include "Validation/RecoTau/interface/TauValidationRECO.h"
+#include "Validation/RecoTau/interface/TauValidation.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 
 #include <cstddef>
@@ -15,7 +15,7 @@ using namespace edm;
 using namespace reco;
 using namespace std;
 
-std::string TauValidationRECO::convertId(double cut) {
+std::string TauValidation::convertId(double cut) {
   if (cut == 0.0) return "0p0";
   std::ostringstream oss;
   oss << std::fixed << std::setprecision(2) << cut;
@@ -26,7 +26,7 @@ std::string TauValidationRECO::convertId(double cut) {
   return result;
 }
 
-bool TauValidationRECO::passIdCut(const std::vector<double> idValuesForTau, const std::vector<std::vector<bool>> wpValuesForTau, 
+bool TauValidation::passIdCut(const std::vector<double> idValuesForTau, const std::vector<std::vector<bool>> wpValuesForTau, 
                                   const std::vector<double>& validCutIDs_raw, const std::vector<int>& validCutIDs_wp,
                                   bool use_raw, bool use_wp) {
 
@@ -57,7 +57,7 @@ bool TauValidationRECO::passIdCut(const std::vector<double> idValuesForTau, cons
 
 }
 
-TauValidationRECO::TauValidationRECO(const edm::ParameterSet& iConfig) {
+TauValidation::TauValidation(const edm::ParameterSet& iConfig) {
   genTauToken_ = consumes<reco::GenJetCollection>(iConfig.getParameter<edm::InputTag>("genTauCollection"));
   recoTauCollection = iConfig.getParameter<edm::InputTag>("recoTauCollection");
   matchingDeltaR = iConfig.getParameter<double>("minDeltaR");
@@ -90,19 +90,19 @@ TauValidationRECO::TauValidationRECO(const edm::ParameterSet& iConfig) {
   if (!recoTauIDLabels_.empty()) {
     if (cutIDs_wp.size() != recoTauIDLabels_.size()) {
       cutIDs_wp.resize(recoTauIDLabels_.size(), -1);
-      edm::LogPrint("TauValidationRECO") << "Warning: cutIDs_wp size (" << cutIDs_wp.size() 
+      edm::LogPrint("TauValidation") << "Warning: cutIDs_wp size (" << cutIDs_wp.size() 
         << ") adjusted to match idLabels size (" << recoTauIDLabels_.size() << ")";
     }
     if (cutIDs_raw.size() != recoTauIDLabels_.size()) {
       cutIDs_raw.resize(recoTauIDLabels_.size(), 0.0);
-      edm::LogPrint("TauValidationRECO") << "Warning: cutIDs_raw size (" << cutIDs_raw.size() 
+      edm::LogPrint("TauValidation") << "Warning: cutIDs_raw size (" << cutIDs_raw.size() 
         << ") adjusted to match idLabels size (" << recoTauIDLabels_.size() << ")";
     }
   }
 
 }
 
-void TauValidationRECO::bookHistograms(DQMStore::IBooker& ibooker, edm::Run const& iRun, edm::EventSetup const&) {
+void TauValidation::bookHistograms(DQMStore::IBooker& ibooker, edm::Run const& iRun, edm::EventSetup const&) {
 
   // ---------------------------- Book Summary Histograms -------------------------------
 
@@ -170,21 +170,21 @@ void TauValidationRECO::bookHistograms(DQMStore::IBooker& ibooker, edm::Run cons
 }
 
 //------------------------------------------------------------------------------
-// ~TauValidationRECO
+// ~TauValidation
 //------------------------------------------------------------------------------
-TauValidationRECO::~TauValidationRECO() {}
+TauValidation::~TauValidation() {}
 
 //------------------------------------------------------------------------------
 // analyze
 //------------------------------------------------------------------------------
-void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup& mSetup) {
+void TauValidation::analyze(const edm::Event& mEvent, const edm::EventSetup& mSetup) {
 
   // --------------------------------- Gen Taus --------------------------------
 
   edm::Handle<reco::GenJetCollection> genTaus;
   mEvent.getByToken(genTauToken_, genTaus);
   if (!genTaus.isValid()) {
-    edm::LogPrint("TauValidationRECO") << " Gen Tau collection not found while running TauValidationRECO.cc ";
+    edm::LogPrint("TauValidation") << " Gen Tau collection not found while running TauValidation.cc ";
     return;
   }
 
@@ -200,7 +200,7 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
     edm::Handle<reco::TauDiscriminatorContainer> recoTauID;
     mEvent.getByToken(recoTauIDTokens_[i], recoTauID);
     if (!recoTauID.isValid()) {
-      edm::LogPrint("TauValidationRECO") << "Reco Tau Identifier " << recoTauIDLabels_[i] << " collection not found while running TauValidationRECO.cc ";
+      edm::LogPrint("TauValidation") << "Reco Tau Identifier " << recoTauIDLabels_[i] << " collection not found while running TauValidation.cc ";
       continue;
     }
     validRecoTauIDs.push_back(recoTauID.product());
@@ -222,7 +222,7 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
     edm::Handle<reco::PFTauCollection> recoTausTmp;
     mEvent.getByToken(recoTauToken_, recoTausTmp);
     if (!recoTausTmp.isValid()) {
-      edm::LogPrint("TauValidationRECO") << " Reco Tau collection not found while running TauValidationRECO.cc ";
+      edm::LogPrint("TauValidation") << " Reco Tau collection not found while running TauValidation.cc ";
       return;
     }
     for (unsigned itau = 0; itau < recoTausTmp->size(); ++itau) {
@@ -247,7 +247,7 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
     edm::Handle<pat::TauCollection> patTaus;
     mEvent.getByToken(patTauToken_, patTaus);
     if (!patTaus.isValid()) {
-      edm::LogPrint("TauValidationRECO") << " PAT Tau collection not found while running TauValidationRECO.cc ";
+      edm::LogPrint("TauValidation") << " PAT Tau collection not found while running TauValidation.cc ";
       return;
     }
     for (unsigned itau = 0; itau < patTaus->size(); ++itau) {
@@ -431,7 +431,7 @@ void TauValidationRECO::analyze(const edm::Event& mEvent, const edm::EventSetup&
 //------------------------------------------------------------------------------
 // fill description
 //------------------------------------------------------------------------------
-void TauValidationRECO::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
+void TauValidation::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
   // Default tau validation HLT
   desc.add<edm::InputTag>("genTauCollection", edm::InputTag("tauGenJets"));
@@ -450,4 +450,4 @@ void TauValidationRECO::fillDescriptions(edm::ConfigurationDescriptions& descrip
   descriptions.addWithDefaultLabel(desc);
 }
 
-DEFINE_FWK_MODULE(TauValidationRECO);
+DEFINE_FWK_MODULE(TauValidation);
