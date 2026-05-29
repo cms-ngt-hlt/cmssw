@@ -88,8 +88,9 @@ TauValidation::TauValidation(const edm::ParameterSet& iConfig) {
   cutIDs_wp = iConfig.getParameter<std::vector<int>>("cutIDs_wp");
   cutIDs_raw = iConfig.getParameter<std::vector<double>>("cutIDs_raw");
 
+  constexpr double EPS = 1e-12;
   use_wp = std::any_of(cutIDs_wp.begin(), cutIDs_wp.end(), [](int x) { return x >= 0; });
-  use_raw = std::any_of(cutIDs_raw.begin(), cutIDs_raw.end(), [](double x) { return x != 0.0; });
+  use_raw = std::any_of(cutIDs_raw.begin(), cutIDs_raw.end(), [](double x) { return std::abs(x) > EPS; });
 
   if (use_wp && use_raw) {
     throw cms::Exception("Configuration") << "Specify either cutIDs_wp OR cutIDs_raw, not both";
@@ -251,8 +252,7 @@ TauValidation::~TauValidation() {}
 void TauValidation::analyze(const edm::Event& mEvent, const edm::EventSetup& mSetup) {
   // --------------------------------- Gen Taus --------------------------------
 
-  edm::Handle<reco::GenJetCollection> genTaus;
-  mEvent.getByToken(genTauToken_, genTaus);
+  auto genTaus = mEvent.getHandle(genTauToken_);
   if (!genTaus.isValid()) {
     LogDebug("TauValidation") << " Gen Tau collection not found while running TauValidation.cc ";
     return;
@@ -267,8 +267,7 @@ void TauValidation::analyze(const edm::Event& mEvent, const edm::EventSetup& mSe
   std::vector<double> validCutIDs_raw;
   std::vector<int> validCutIDs_wp;
   for (size_t i = 0; i < recoTauIDTokens_.size(); ++i) {
-    edm::Handle<reco::TauDiscriminatorContainer> recoTauID;
-    mEvent.getByToken(recoTauIDTokens_[i], recoTauID);
+    auto recoTauID = mEvent.getHandle(recoTauIDTokens_[i]);
     if (!recoTauID.isValid()) {
       LogDebug("TauValidation") << "Reco Tau Identifier " << recoTauIDLabels_[i]
                                 << " collection not found while running TauValidation.cc ";
@@ -290,8 +289,7 @@ void TauValidation::analyze(const edm::Event& mEvent, const edm::EventSetup& mSe
   std::vector<std::vector<std::vector<bool>>> recoTauWPValues;
 
   if (!isPatTaus) {
-    edm::Handle<reco::PFTauCollection> recoTausTmp;
-    mEvent.getByToken(recoTauToken_, recoTausTmp);
+    auto recoTausTmp = mEvent.getHandle(recoTauToken_);
     if (!recoTausTmp.isValid()) {
       LogDebug("TauValidation") << " Reco Tau collection not found while running TauValidation.cc ";
       return;
@@ -301,7 +299,6 @@ void TauValidation::analyze(const edm::Event& mEvent, const edm::EventSetup& mSe
       std::vector<std::vector<bool>> wpValuesForTau;
       for (size_t i = 0; i < validRecoTauIDs.size(); ++i) {
         reco::PFTauRef tauRef = reco::PFTauRef(recoTausTmp, itau);
-        edm::Handle<reco::TauDiscriminatorContainer> recoTauID;
         const auto& disc = (*validRecoTauIDs[i])[tauRef];
         idValuesForTau.push_back(disc.rawValues.empty() ? -1.0 : disc.rawValues[0]);
         wpValuesForTau.push_back(disc.workingPoints.empty() ? std::vector<bool>(1, false) : disc.workingPoints);
@@ -314,8 +311,7 @@ void TauValidation::analyze(const edm::Event& mEvent, const edm::EventSetup& mSe
       recoTaus.push_back(recoTausTmp->at(itau));
     }
   } else {
-    edm::Handle<pat::TauCollection> patTaus;
-    mEvent.getByToken(patTauToken_, patTaus);
+    auto patTaus = mEvent.getHandle(patTauToken_);
     if (!patTaus.isValid()) {
       LogDebug("TauValidation") << " PAT Tau collection not found while running TauValidation.cc ";
       return;
@@ -327,7 +323,6 @@ void TauValidation::analyze(const edm::Event& mEvent, const edm::EventSetup& mSe
       std::vector<std::vector<bool>> wpValuesForTau;
       for (size_t i = 0; i < validRecoTauIDs.size(); ++i) {
         pat::TauRef tauRef = pat::TauRef(patTaus, itau);
-        edm::Handle<reco::TauDiscriminatorContainer> recoTauID;
         const auto& disc = (*validRecoTauIDs[i])[tauRef];
         idValuesForTau.push_back(disc.rawValues.empty() ? -1.0 : disc.rawValues[0]);
         wpValuesForTau.push_back(disc.workingPoints.empty() ? std::vector<bool>(1, false) : disc.workingPoints);
@@ -346,7 +341,7 @@ void TauValidation::analyze(const edm::Event& mEvent, const edm::EventSetup& mSe
   // --------------------------------- Compute Metrics --------------------------------
 
   // Loop for efficiency
-  for (uint itau = 0; itau < genTaus->size(); ++itau) {
+  for (unsigned itau = 0; itau < genTaus->size(); ++itau) {
     h_genTau_["pt"]->Fill(genTaus->at(itau).pt());
     h_genTau_["eta"]->Fill(genTaus->at(itau).eta());
     h_genTau_["phi"]->Fill(genTaus->at(itau).phi());
@@ -362,7 +357,7 @@ void TauValidation::analyze(const edm::Event& mEvent, const edm::EventSetup& mSe
     float bestDeltaR = 999.;
     float ResponsePt_bestDeltaR = 0.;
     float ResponseMass_bestDeltaR = 0.;
-    for (uint jtau = 0; jtau < recoTaus.size(); ++jtau) {
+    for (unsigned jtau = 0; jtau < recoTaus.size(); ++jtau) {
       float deltaRValue = deltaR(genTaus->at(itau), recoTaus.at(jtau));
       if (deltaRValue < matchingDeltaR) {
         nRecoMatchedToOneGen++;
@@ -412,7 +407,7 @@ void TauValidation::analyze(const edm::Event& mEvent, const edm::EventSetup& mSe
   }
 
   // Loop for fake rate
-  for (uint itau = 0; itau < recoTaus.size(); ++itau) {
+  for (unsigned itau = 0; itau < recoTaus.size(); ++itau) {
     h_recoTau_["pt"]->Fill(recoTaus.at(itau).pt());
     h_recoTau_["eta"]->Fill(recoTaus.at(itau).eta());
     h_recoTau_["phi"]->Fill(recoTaus.at(itau).phi());
@@ -437,7 +432,7 @@ void TauValidation::analyze(const edm::Event& mEvent, const edm::EventSetup& mSe
 
     // Count how many gen taus are matched to the reco tau
     int nGenMatchedToOneReco = 0;
-    for (uint jtau = 0; jtau < genTaus->size(); ++jtau) {
+    for (unsigned jtau = 0; jtau < genTaus->size(); ++jtau) {
       if (deltaR(genTaus->at(jtau), recoTaus.at(itau)) < matchingDeltaR) {
         nGenMatchedToOneReco++;
       }
