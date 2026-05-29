@@ -45,9 +45,10 @@ bool TauValidation::passIdCut(const std::vector<double> idValuesForTau,
         }
       }
     }
+    return true;
   }
 
-  if (use_wp) {
+  else if (use_wp) {
     for (size_t i = 0; i < wpValuesForTau.size(); ++i) {
       if (validCutIDs_wp[i] >= 0) {
         if (validCutIDs_wp[i] > static_cast<int>(wpValuesForTau[i].size())) {
@@ -58,9 +59,10 @@ bool TauValidation::passIdCut(const std::vector<double> idValuesForTau,
         }
       }
     }
+    return true;
   }
 
-  return true;
+  return false;
 }
 
 TauValidation::TauValidation(const edm::ParameterSet& iConfig) {
