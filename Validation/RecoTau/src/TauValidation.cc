@@ -99,12 +99,12 @@ TauValidation::TauValidation(const edm::ParameterSet& iConfig) {
     if (cutIDs_wp.size() != recoTauIDLabels_.size()) {
       cutIDs_wp.resize(recoTauIDLabels_.size(), -1);
       LogDebug("TauValidation") << "Warning: cutIDs_wp size (" << cutIDs_wp.size()
-                                     << ") adjusted to match idLabels size (" << recoTauIDLabels_.size() << ")";
+                                << ") adjusted to match idLabels size (" << recoTauIDLabels_.size() << ")";
     }
     if (cutIDs_raw.size() != recoTauIDLabels_.size()) {
       cutIDs_raw.resize(recoTauIDLabels_.size(), 0.0);
       LogDebug("TauValidation") << "Warning: cutIDs_raw size (" << cutIDs_raw.size()
-                                     << ") adjusted to match idLabels size (" << recoTauIDLabels_.size() << ")";
+                                << ") adjusted to match idLabels size (" << recoTauIDLabels_.size() << ")";
     }
   }
 }
@@ -271,7 +271,7 @@ void TauValidation::analyze(const edm::Event& mEvent, const edm::EventSetup& mSe
     mEvent.getByToken(recoTauIDTokens_[i], recoTauID);
     if (!recoTauID.isValid()) {
       LogDebug("TauValidation") << "Reco Tau Identifier " << recoTauIDLabels_[i]
-                                     << " collection not found while running TauValidation.cc ";
+                                << " collection not found while running TauValidation.cc ";
       continue;
     }
     validRecoTauIDs.push_back(recoTauID.product());
@@ -280,7 +280,7 @@ void TauValidation::analyze(const edm::Event& mEvent, const edm::EventSetup& mSe
     validCutIDs_wp.push_back(cutIDs_wp[i]);
   }
 
-  bool plotId = validRecoTauIDs.size() > 0;
+  bool plotId = !validRecoTauIDs.empty();
   bool applyIdCuts = plotId && (use_wp || use_raw);
 
   // --------------------------------- Reco Taus --------------------------------
