@@ -39,11 +39,12 @@ MAKE_COMPARISON="${SCRIPT_DIR}/makeComparisonPlots.py"
 ENERGY_TEXT="Ten Tau (150 PU) | 14 TeV"
 
 # Configuration for selected DeltaR and ID cut
-SUB_DIR="CutWP_VSjet0"
-OUTDIR_SUFFIX="CutWP_VSjet0"
-OUTDIR_COMPARISON="TauValidationPlots/Comparison_${OUTDIR_SUFFIX}_HLTvsRECO"
+SUB_DIR="CutWP_VSjet0" # "CutID_VSjet0p50"
+OUTDIR_SUFFIX="CutWP_VSjet0" # "CutID_VSjet0p50"
+LABEL_TEXT="Tau validation WP vs jet > 0"
+OUTDIR_COMPARISON="TauValidationPlots/Summary_${OUTDIR_SUFFIX}_HLTvsRECO"
 
-PT_REBIN="0,10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200,220,240,260,280,300"
+PT_REBIN="0,10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,160,170,180,190,200,220,240,260,280,300,320,340,360,380,400"
 ETA_REBIN="-2.4,-2.0,-1.6,-1.2,-0.8,-0.4,0.0,0.4,0.8,1.2,1.6,2.0,2.4"
 PHI_REBIN="-3.5,-2.8,-2.1,-1.4,-0.7,0.0,0.7,1.4,2.1,2.8,3.5"
 
@@ -113,7 +114,7 @@ make_summary_plot() {
         --ylabel "$ylabel"
         --ylim "$ylim"
         --energy-text "$ENERGY_TEXT"
-        --leg-title "${LABEL_TEXT}"
+        --leg-title "${STEP} ${LABEL_TEXT}"
         --odir "${OUTDIR_SUMMARY}"
         --name "$name"
     )
@@ -152,7 +153,6 @@ for step in "${STEPS[@]}"; do
     esac
 
     # Setup paths for this step
-    LABEL_TEXT="${STEP} Tau validation WP vs jet > 0"
     OUTDIR_SUMMARY="TauValidationPlots/Summary_${OUTDIR_SUFFIX}_${step_upper}"
     SELECTED_DIR="${BASE_DIR}/${SUB_DIR}"
 
